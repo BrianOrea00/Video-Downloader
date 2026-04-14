@@ -1,4 +1,4 @@
-import yt-dlp
+import yt_dlp
 import subprocess
 import threading
 
@@ -8,7 +8,7 @@ class Downloader:
         self.cancelled = False
 
     def get_info(self, url):
-        with yt-dlp.YoutubeDL() as ydl:
+        with yt_dlp.YoutubeDL() as ydl:
             return ydl.extract_info(url, download = False)
 
     def download(self, url, path, resolution, progress_callback, done_callback):
@@ -22,13 +22,13 @@ class Downloader:
                     raise Exception("Cancelled")
 
             ydl_opts = {
-                    'outtmpl': f'{path}/&(title)s.%(ext)s',
+                    'outtmpl': f'{path}/%(title)s.%(ext)s',
                     'format': f'bestvideo[height<={resolution}]+bestaudio/best',
                     'progress_hook': [hook]
             }
 
             try:
-                with yt-dlp.YoutubeDL(ydl_opts) as ydl:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
                 done_callback("Finished!")
             except Exception as e:
