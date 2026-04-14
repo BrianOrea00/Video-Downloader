@@ -1,6 +1,6 @@
 import json
 import os
-import config import HISTORY_FILE
+from config import HISTORY_FILE
 
 def save_history(data):
     if not os.path.exists(HISTORY_FILE):
