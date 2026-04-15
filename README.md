@@ -11,7 +11,7 @@ This project allows you to download videos from supported websites with a clean 
 * URL input box
 * Select download folder
 * Choose video resolution
-* Download progress bar (with speed & ETA) (still not working)
+* Download progress bar (with speed & ETA)
 * Video info preview (title & duration)
 * Cancel download (basic)
 * Download history (saved locally)
