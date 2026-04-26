@@ -8,13 +8,16 @@ This project allows you to download videos from supported websites with a clean 
 
 ## 🚀 Features
 
-* URL input box
-* Select download folder
-* Choose video resolution
-* Download progress bar (with speed & ETA)
+* URL input box with clipboard auto-detect
+* Select download folder (Browse button)
+* Choose video resolution (144p to 1080p)
+* Audio-only mode (MP3 download)
+* Download progress bar (with percentage)
+* Real-time download speed display
+* ETA (Estimated Time Arrival) display
 * Video info preview (title & duration)
-* Cancel download (basic)
-* Download history (saved locally)
+* Cancel download (basic stop functionality)
+* Download history (saved locally to JSON)
 
 ---
 
@@ -120,6 +123,7 @@ python main.py
 * Real cancel (force stop process)
 * Thumbnail preview
 * Drag & drop URL
+* History viewer window (view past downloads)
 
 ---
 
