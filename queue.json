@@ -1,0 +1,18 @@
+[
+    {
+        "url": "https://youtu.be/z4eA2eC28qg?si=Kpc38mgBUJ_3swwX",
+        "path": "/home/arisu/Workspace/Video-Downloader",
+        "resolution": "360",
+        "audio_only": false,
+        "title": "Give Me 20 Minutes and I\u2019ll Make You a Vim Motions Expert",
+        "status": "pending"
+    },
+    {
+        "url": "https://youtu.be/z4eA2eC28qg?si=XFY5BLQPaV8SKM9L",
+        "path": "/home/arisu/Workspace/Video-Downloader",
+        "resolution": "720",
+        "audio_only": false,
+        "title": "Give Me 20 Minutes and I\u2019ll Make You a Vim Motions Expert",
+        "status": "pending"
+    }
+]
