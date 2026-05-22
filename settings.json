@@ -1,0 +1,9 @@
+{
+    "theme": "light",
+    "parallel_limit": 2,
+    "download_mode": "parallel",
+    "auto_clipboard": true,
+    "clipboard_interval": 3000,
+    "default_resolution": "720",
+    "default_audio_only": false
+}

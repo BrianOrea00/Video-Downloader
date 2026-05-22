@@ -1,204 +1,232 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from downloader import Downloader
-from config import RESOLUTIONS
-from utils import save_history
+from tkinter import ttk, messagebox
+from config import THEMES  # Changed from THEME to THEMES
+from utils import load_settings, save_settings, detect_vlc
+from queue_tab import QueueTab
+from videos_tab import VideosTab
+from music_tab import MusicTab
+from settings_tab import SettingsTab
 
 class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Video Downloader")
-        self.root.geometry("650x550")
-
-        self.downloader = Downloader()
-        self.current_download = None
-        self.last_percent = 0
-
-        self.url_var = tk.StringVar()
-        self.path_var = tk.StringVar()
-        self.res_var = tk.StringVar(value="720")
-        self.audio_only = tk.BooleanVar()
-
-        self.root.after(1000, self.check_clipboard)
+        self.root.geometry("1000x700")
+        self.root.minsize(800, 600)
+        
+        # Load settings
+        self.settings = load_settings()
+        self.current_theme = self.settings.get("theme", "light")
+        
+        # Detect VLC
+        self.vlc_path = detect_vlc()
+        if not self.vlc_path:
+            print("Warning: VLC not found. Media playback will be disabled.")
+        
+        # Current active tab
+        self.current_tab = None
+        
+        # Build UI
         self.build_ui()
-
+        
+        # Apply theme
+        self.apply_theme()
+        
+        # Start clipboard checking if enabled
+        if self.settings.get("auto_clipboard", True):
+            self.root.after(1000, self.check_clipboard)
+        
+        # Set download path from settings if exists
+        if self.settings.get("download_path"):
+            self.queue_tab.path_var.set(self.settings["download_path"])
+    
     def build_ui(self):
-        main_frame = tk.Frame(self.root, padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        tk.Label(main_frame, text="Video URL:", font=('Arial', 10, 'bold')).pack(anchor=tk.W)
-        url_entry = tk.Entry(main_frame, textvariable=self.url_var, width=70, font=('Arial', 10))
-        url_entry.pack(fill=tk.X, pady=(5, 10))
-
-        tk.Label(main_frame, text="Save Path:", font=('Arial', 10, 'bold')).pack(anchor=tk.W)
-        path_frame = tk.Frame(main_frame)
-        path_frame.pack(fill=tk.X, pady=(5, 10))
+        """Build the main UI with sidebar and content area"""
+        # Main container
+        self.main_container = tk.Frame(self.root)
+        self.main_container.pack(fill=tk.BOTH, expand=True)
         
-        tk.Entry(path_frame, textvariable=self.path_var, width=55, font=('Arial', 10)).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Button(path_frame, text="Browse", command=self.browse, width=10).pack(side=tk.LEFT, padx=(5, 0))
-
-        options_frame = tk.LabelFrame(main_frame, text="Download Options", padx=10, pady=10)
-        options_frame.pack(fill=tk.X, pady=10)
+        # Create sidebar frame
+        self.sidebar = tk.Frame(self.main_container, width=200, relief=tk.RAISED, bd=1)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y, padx=0, pady=0)
+        self.sidebar.pack_propagate(False)
         
-        tk.Checkbutton(options_frame, text="Audio Only (MP3)", variable=self.audio_only, font=('Arial', 10)).pack(anchor=tk.W)
+        # Create content frame
+        self.content_frame = tk.Frame(self.main_container)
+        self.content_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        resolution_frame = tk.Frame(options_frame)
-        resolution_frame.pack(anchor=tk.W, pady=(5, 0))
-        tk.Label(resolution_frame, text="Resolution:", font=('Arial', 10)).pack(side=tk.LEFT)
-        resolution_combo = ttk.Combobox(resolution_frame, values=RESOLUTIONS, textvariable=self.res_var, width=10, state='readonly')
-        resolution_combo.pack(side=tk.LEFT, padx=(10, 0))
-
-        preview_frame = tk.Frame(main_frame)
-        preview_frame.pack(fill=tk.X, pady=10)
-        tk.Button(preview_frame, text="Preview Info", command=self.preview, width=15).pack(side=tk.LEFT)
-        self.info_label = tk.Label(preview_frame, text="", font=('Arial', 9, 'italic'), fg='gray')
-        self.info_label.pack(side=tk.LEFT, padx=(10, 0))
-
-        progress_frame = tk.LabelFrame(main_frame, text="Download Progress", padx=10, pady=10)
-        progress_frame.pack(fill=tk.X, pady=10)
+        # Top bar with theme toggle
+        self.top_bar = tk.Frame(self.content_frame)
+        self.top_bar.pack(fill=tk.X, pady=(0, 10))
         
-        self.percent_label = tk.Label(progress_frame, text="0%", font=('Arial', 10, 'bold'), fg='blue')
-        self.percent_label.pack(anchor=tk.W, pady=(0, 5))
+        self.title_label = tk.Label(self.top_bar, text="Video Downloader", font=('Arial', 16, 'bold'))
+        self.title_label.pack(side=tk.LEFT)
         
-        self.progress = ttk.Progressbar(progress_frame, length=400, mode='determinate')
-        self.progress.pack(fill=tk.X, pady=(0, 10))
+        self.theme_btn = tk.Button(
+            self.top_bar, 
+            text="🌙 Dark Mode" if self.current_theme == "light" else "☀️ Light Mode",
+            command=self.toggle_theme,
+            width=12
+        )
+        self.theme_btn.pack(side=tk.RIGHT, padx=5)
         
-        self.status_frame = tk.Frame(progress_frame)
-        self.status_frame.pack(fill=tk.X)
+        # Build sidebar buttons
+        self.build_sidebar()
         
-        self.status_label = tk.Label(self.status_frame, text="Ready", font=('Arial', 9), anchor=tk.W, justify=tk.LEFT)
-        self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # Initialize tabs
+        self.queue_tab = QueueTab(self.content_frame, self)
+        self.videos_tab = VideosTab(self.content_frame, self)
+        self.music_tab = MusicTab(self.content_frame, self)
+        self.settings_tab = SettingsTab(self.content_frame, self)
         
-        self.speed_label = tk.Label(self.status_frame, text="", font=('Arial', 9), fg='blue')
-        self.speed_label.pack(side=tk.RIGHT, padx=(10, 0))
+        # Hide all tabs initially
+        self.queue_tab.hide()
+        self.videos_tab.hide()
+        self.music_tab.hide()
+        self.settings_tab.hide()
         
-        self.eta_label = tk.Label(self.status_frame, text="", font=('Arial', 9), fg='green')
-        self.eta_label.pack(side=tk.RIGHT, padx=(10, 0))
-
-        btn_frame = tk.Frame(main_frame)
-        btn_frame.pack(pady=10)
+        # Show default tab (Queue)
+        self.show_tab("queue")
+    
+    def build_sidebar(self):
+        """Create sidebar navigation buttons"""
+        # App logo/title in sidebar
+        logo_label = tk.Label(
+            self.sidebar, 
+            text="📥\nDownloader", 
+            font=('Arial', 14, 'bold'),
+            pady=20
+        )
+        logo_label.pack(fill=tk.X)
         
-        tk.Button(btn_frame, text="Download", command=self.start_download, width=12, bg='#4CAF50', fg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Cancel", command=self.cancel, width=12, bg='#f44336', fg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=5)
-
-    def browse(self):
-        folder = filedialog.askdirectory()
-        if folder:
-            self.path_var.set(folder)
-
+        # Navigation buttons
+        buttons = [
+            ("⏯️ Queue", "queue"),
+            ("📹 Videos", "videos"),
+            ("🎵 Music", "music"),
+            ("⚙️ Settings", "settings")
+        ]
+        
+        self.nav_buttons = {}
+        for text, tab_name in buttons:
+            btn = tk.Button(
+                self.sidebar,
+                text=text,
+                font=('Arial', 11),
+                pady=10,
+                command=lambda t=tab_name: self.show_tab(t),
+                relief=tk.FLAT
+            )
+            btn.pack(fill=tk.X, padx=10, pady=5)
+            self.nav_buttons[tab_name] = btn
+    
+    def show_tab(self, tab_name):
+        """Show selected tab and hide others"""
+        # Update button styles - removed bg='' which was causing error
+        for name, btn in self.nav_buttons.items():
+            btn.config(relief=tk.FLAT)
+            # Don't set bg to empty string, use default or theme color
+            if hasattr(self, 'current_theme'):
+                theme = THEMES[self.current_theme]
+                btn.config(bg=theme["sidebar_bg"], fg=theme["fg"])
+        
+        if tab_name in self.nav_buttons:
+            self.nav_buttons[tab_name].config(relief=tk.SUNKEN)
+        
+        # Hide all tabs
+        self.queue_tab.hide()
+        self.videos_tab.hide()
+        self.music_tab.hide()
+        self.settings_tab.hide()
+        
+        # Show selected tab
+        if tab_name == "queue":
+            self.queue_tab.show()
+            self.title_label.config(text="📥 Download Queue")
+            # Refresh queue display
+            self.queue_tab.refresh_queue_display()
+        elif tab_name == "videos":
+            self.videos_tab.show()
+            self.title_label.config(text="📹 Video Library")
+            # Refresh video list
+            self.videos_tab.refresh_list()
+        elif tab_name == "music":
+            self.music_tab.show()
+            self.title_label.config(text="🎵 Music Library")
+            # Refresh music list
+            self.music_tab.refresh_list()
+        elif tab_name == "settings":
+            self.settings_tab.show()
+            self.title_label.config(text="⚙️ Settings")
+        
+        self.current_tab = tab_name
+    
+    def toggle_theme(self):
+        """Toggle between light and dark themes"""
+        if self.current_theme == "light":
+            self.current_theme = "dark"
+            self.theme_btn.config(text="☀️ Light Mode")
+        else:
+            self.current_theme = "light"
+            self.theme_btn.config(text="🌙 Dark Mode")
+        
+        self.settings["theme"] = self.current_theme
+        save_settings(self.settings)
+        self.apply_theme()
+    
+    def apply_theme(self):
+        """Apply current theme colors to all widgets"""
+        theme = THEMES[self.current_theme]
+        
+        # Apply to root window
+        self.root.configure(bg=theme["bg"])
+        
+        # Apply to main container
+        self.main_container.configure(bg=theme["bg"])
+        
+        # Apply to sidebar
+        self.sidebar.configure(bg=theme["sidebar_bg"])
+        
+        # Apply to content frame
+        self.content_frame.configure(bg=theme["bg"])
+        
+        # Apply to top bar
+        self.top_bar.configure(bg=theme["bg"])
+        self.title_label.configure(bg=theme["bg"], fg=theme["fg"])
+        self.theme_btn.configure(bg=theme["button_bg"], fg=theme["button_fg"])
+        
+        # Apply to sidebar buttons
+        for btn in self.nav_buttons.values():
+            btn.configure(bg=theme["sidebar_bg"], fg=theme["fg"])
+        
+        # Apply to tabs
+        if hasattr(self, 'queue_tab'):
+            self.queue_tab.apply_theme(theme)
+            self.videos_tab.apply_theme(theme)
+            self.music_tab.apply_theme(theme)
+            self.settings_tab.apply_theme(theme)
+    
     def check_clipboard(self):
+        """Auto-detect URLs from clipboard"""
+        if not self.settings.get("auto_clipboard", True):
+            self.root.after(3000, self.check_clipboard)
+            return
+        
         try:
             text = self.root.clipboard_get()
             if "http" in text or "youtu" in text:
-                self.url_var.set(text)
+                # Only auto-fill if queue tab is showing and url entry exists
+                if self.current_tab == "queue":
+                    self.queue_tab.url_var.set(text)
         except:
             pass
-        self.root.after(3000, self.check_clipboard)
-
-    def preview(self):
-        if not self.url_var.get():
-            messagebox.showwarning("Warning", "Please enter a URL first")
-            return
-            
-        try:
-            self.info_label.config(text="Fetching video info...", fg='orange')
-            self.root.update()
-            
-            info = self.downloader.get_info(self.url_var.get())
-            duration = info.get('duration', 0)
-            duration_str = f"{duration // 60}:{duration % 60:02d}" if duration else "Unknown"
-            self.info_label.config(text=f"📹 {info['title']} ({duration_str})", fg='gray')
-        except Exception as e:
-            self.info_label.config(text="Failed to fetch info", fg='red')
-            messagebox.showerror("Error", f"Failed to fetch video info:\n{str(e)}")
-
-    def update_progress(self, data):
-        def update():
-            if '_percent' in data:
-                percent = data['_percent']
-                self.progress['value'] = percent
-                self.percent_label.config(text=f"{percent:.1f}%")
-            elif '_percent_str' in data:
-                percent_str = data['_percent_str'].strip('%')
-                try:
-                    percent = float(percent_str)
-                    self.progress['value'] = percent
-                    self.percent_label.config(text=f"{percent:.1f}%")
-                except ValueError:
-                    pass
-            
-            if '_speed_str' in data and data['_speed_str']:
-                self.speed_label.config(text=f"⚡ {data['_speed_str']}")
-            else:
-                self.speed_label.config(text="")
-            
-            if '_eta_str' in data and data['_eta_str']:
-                self.eta_label.config(text=f"⏱ {data['_eta_str']}")
-            else:
-                self.eta_label.config(text="")
-            
-            if '_downloaded_bytes_str' in data and '_total_bytes_str' in data:
-                self.status_label.config(text=f"Downloading: {data['_downloaded_bytes_str']} / {data['_total_bytes_str']}")
-            elif '_percent_str' in data:
-                self.status_label.config(text=f"Downloading: {data['_percent_str']}")
-            elif data.get('status') == 'finished':
-                self.status_label.config(text="Processing download...")
-            else:
-                self.status_label.config(text="Downloading...")
-            
-            self.root.update_idletasks()
         
-        self.root.after(0, update)
-
-    def done(self, msg):
-        def show_done():
-            if "Error" in msg or "Cancelled" in msg:
-                messagebox.showerror("Download Status", msg)
-                self.status_label.config(text=f"❌ {msg}")
-            else:
-                messagebox.showinfo("Download Status", msg)
-                self.status_label.config(text=f"✅ {msg}")
-            
-            self.progress['value'] = 0
-            self.percent_label.config(text="0%")
-            self.speed_label.config(text="")
-            self.eta_label.config(text="")
-            
-            save_history({
-                "url": self.url_var.get(),
-                "resolution": self.res_var.get() if not self.audio_only.get() else "Audio Only",
-                "status": msg
-            })
-            
-            if "completed" in msg.lower():
-                self.url_var.set("")
-        
-        self.root.after(0, show_done)
-
-    def start_download(self):
-        if not self.url_var.get():
-            messagebox.showwarning("Warning", "Please enter a video URL")
-            return
-        
-        if not self.path_var.get():
-            messagebox.showwarning("Warning", "Please select a save path")
-            return
-        
-        self.progress['value'] = 0
-        self.percent_label.config(text="0%")
-        self.status_label.config(text="Starting download...")
-        self.speed_label.config(text="")
-        self.eta_label.config(text="")
-        
-        self.downloader.download(
-            self.url_var.get(),
-            self.path_var.get(),
-            self.res_var.get(),
-            self.update_progress,
-            self.done,
-            audio_only=self.audio_only.get()
-        )
-
-    def cancel(self):
-        self.downloader.cancel()
-        self.status_label.config(text="Cancelling download...")
+        interval = self.settings.get("clipboard_interval", 3000)
+        self.root.after(interval, self.check_clipboard)
+    
+    def on_download_complete(self):
+        """Called when a download completes - refresh library tabs"""
+        if self.current_tab == "videos":
+            self.videos_tab.refresh_list()
+        elif self.current_tab == "music":
+            self.music_tab.refresh_list()
