@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 from downloader import Downloader
 from config import RESOLUTIONS
 from utils import save_history, load_queue, save_queue
+import threading
 
 class QueueTab:
     def __init__(self, parent, app):
@@ -11,7 +12,8 @@ class QueueTab:
         self.frame = tk.Frame(parent)
         self.downloader = Downloader()
         self.queue = load_queue()
-        self.current_downloads = []
+        self.downloading = False
+        self.active_downloads = []
         
         self.build_ui()
     
@@ -80,9 +82,22 @@ class QueueTab:
         tk.Button(queue_btn_frame, text="Move Down", command=self.move_down, width=10).pack(side=tk.LEFT, padx=2)
         tk.Button(queue_btn_frame, text="Clear Queue", command=self.clear_queue, width=10).pack(side=tk.LEFT, padx=2)
         
-        # Progress Section (will be enhanced later)
+        # Queue Action Buttons
+        action_frame = tk.Frame(main_frame)
+        action_frame.pack(fill=tk.X, pady=5)
+        
+        self.start_btn = tk.Button(action_frame, text="▶ Start Queue", command=self.start_queue, width=12, bg='#4CAF50', fg='white')
+        self.start_btn.pack(side=tk.LEFT, padx=2)
+        
+        self.stop_btn = tk.Button(action_frame, text="⏸ Stop Queue", command=self.stop_queue, width=12, bg='#f44336', fg='white', state='disabled')
+        self.stop_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Progress Section
         progress_frame = tk.LabelFrame(main_frame, text="Current Download", padx=10, pady=10)
         progress_frame.pack(fill=tk.X, pady=10)
+        
+        self.current_title = tk.Label(progress_frame, text="No active download", font=('Arial', 9, 'italic'))
+        self.current_title.pack(anchor=tk.W, pady=(0, 5))
         
         self.percent_label = tk.Label(progress_frame, text="0%", font=('Arial', 10, 'bold'), fg='blue')
         self.percent_label.pack(anchor=tk.W, pady=(0, 5))
@@ -192,14 +207,152 @@ class QueueTab:
     def refresh_queue_display(self):
         self.queue_listbox.delete(0, tk.END)
         for item in self.queue:
-            status_icon = "⏳" if item.get("status") == "pending" else "✅" if item.get("status") == "completed" else "❌"
+            status_icon = "⏳" if item.get("status") == "pending" else "▶️" if item.get("status") == "downloading" else "✅" if item.get("status") == "completed" else "❌"
             display_text = f"{status_icon} {item.get('title', 'Unknown')} - {item.get('resolution', 'N/A')}"
             if item.get('audio_only'):
                 display_text += " (Audio)"
             self.queue_listbox.insert(tk.END, display_text)
     
+    def start_queue(self):
+        """Start processing the queue"""
+        if self.downloading:
+            return
+        
+        # Check if there are pending items
+        pending = any(item.get("status") == "pending" for item in self.queue)
+        if not pending:
+            messagebox.showinfo("Queue Empty", "No pending downloads in queue")
+            return
+        
+        self.downloading = True
+        self.start_btn.config(state='disabled')
+        self.stop_btn.config(state='normal')
+        self.status_label.config(text="Queue processing started...")
+        
+        # Start queue processor in a separate thread
+        thread = threading.Thread(target=self.process_queue, daemon=True)
+        thread.start()
+    
+    def stop_queue(self):
+        """Stop processing the queue"""
+        self.downloading = False
+        self.start_btn.config(state='normal')
+        self.stop_btn.config(state='disabled')
+        self.status_label.config(text="Queue stopped by user")
+    
+    def process_queue(self):
+        """Process items in the queue one by one"""
+        for i, item in enumerate(self.queue):
+            if not self.downloading:
+                break
+            
+            if item.get("status") == "pending":
+                # Update status to downloading
+                item["status"] = "downloading"
+                save_queue(self.queue)
+                
+                # Update UI
+                self.frame.after(0, lambda: self.refresh_queue_display())
+                self.frame.after(0, lambda t=item['title']: self.current_title.config(text=f"Downloading: {t}"))
+                
+                # Download the item
+                self.download_item(item)
+                
+                # Wait for download to complete (status will be updated by download_item)
+                while item.get("status") == "downloading" and self.downloading:
+                    import time
+                    time.sleep(0.5)
+        
+        self.downloading = False
+        self.frame.after(0, lambda: self.start_btn.config(state='normal'))
+        self.frame.after(0, lambda: self.stop_btn.config(state='disabled'))
+        self.frame.after(0, lambda: self.status_label.config(text="Queue processing completed!"))
+        self.frame.after(0, lambda: self.current_title.config(text="No active download"))
+    
+    def download_item(self, item):
+        """Download a single queue item"""
+        download_complete = threading.Event()
+        
+        def update_progress(data):
+            def update():
+                if '_percent' in data:
+                    percent = data['_percent']
+                    self.progress['value'] = percent
+                    self.percent_label.config(text=f"{percent:.1f}%")
+                elif '_percent_str' in data:
+                    percent_str = data['_percent_str'].strip('%')
+                    try:
+                        percent = float(percent_str)
+                        self.progress['value'] = percent
+                        self.percent_label.config(text=f"{percent:.1f}%")
+                    except ValueError:
+                        pass
+                
+                if '_speed_str' in data and data['_speed_str']:
+                    self.speed_label.config(text=f"⚡ {data['_speed_str']}")
+                else:
+                    self.speed_label.config(text="")
+                
+                if '_eta_str' in data and data['_eta_str']:
+                    self.eta_label.config(text=f"⏱ {data['_eta_str']}")
+                else:
+                    self.eta_label.config(text="")
+                
+                if '_downloaded_bytes_str' in data and '_total_bytes_str' in data:
+                    self.status_label.config(text=f"Downloading: {data['_downloaded_bytes_str']} / {data['_total_bytes_str']}")
+                elif '_percent_str' in data:
+                    self.status_label.config(text=f"Downloading: {data['_percent_str']}")
+                elif data.get('status') == 'finished':
+                    self.status_label.config(text="Processing download...")
+            
+            self.frame.after(0, update)
+        
+        def done_callback(msg):
+            def finalize():
+                if "completed" in msg.lower():
+                    item["status"] = "completed"
+                    self.status_label.config(text="✅ Download completed!")
+                    save_history({
+                        "url": item["url"],
+                        "resolution": item["resolution"] if not item["audio_only"] else "Audio Only",
+                        "status": msg
+                    })
+                    # Notify app to refresh library tabs
+                    self.app.on_download_complete()
+                else:
+                    item["status"] = "failed"
+                    self.status_label.config(text=f"❌ {msg}")
+                
+                save_queue(self.queue)
+                self.refresh_queue_display()
+                
+                # Reset progress display
+                self.progress['value'] = 0
+                self.percent_label.config(text="0%")
+                self.speed_label.config(text="")
+                self.eta_label.config(text="")
+                
+                download_complete.set()
+            
+            self.frame.after(0, finalize)
+        
+        # Create a downloader instance for this item
+        downloader = Downloader()
+        downloader.download(
+            item["url"],
+            item["path"],
+            item["resolution"],
+            update_progress,
+            done_callback,
+            audio_only=item["audio_only"]
+        )
+        
+        # Wait for download to complete or be cancelled
+        download_complete.wait()
+    
     def show(self):
         self.frame.pack(fill=tk.BOTH, expand=True)
+        self.refresh_queue_display()
     
     def hide(self):
         self.frame.pack_forget()
@@ -214,19 +367,16 @@ class QueueTab:
             if isinstance(widget, (tk.Frame, tk.LabelFrame, tk.Label)):
                 widget.configure(bg=theme["bg"])
                 if isinstance(widget, tk.Label):
-                    # Only change fg if it's not a special color
                     current_fg = widget.cget("fg")
-                    if current_fg not in ["orange", "red", "gray", "#ffa500", "#ff0000", "#808080"]:
+                    if current_fg not in ["orange", "red", "gray", "#ffa500", "#ff0000", "#808080", "blue", "green"]:
                         widget.configure(fg=theme["fg"])
             elif isinstance(widget, tk.Button):
                 current_bg = widget.cget("bg")
-                # Don't change colored buttons (blue, green, red)
                 if current_bg not in ["#2196F3", "#4CAF50", "#f44336", "#4caf50", "#388e3c"]:
                     widget.configure(bg=theme["button_bg"], fg=theme["button_fg"])
             elif isinstance(widget, tk.Entry):
                 widget.configure(bg=theme["entry_bg"], fg=theme["entry_fg"])
             elif isinstance(widget, ttk.Combobox):
-                # Skip ttk widgets as they handle styling differently
                 pass
         except:
             pass
