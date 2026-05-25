@@ -11,10 +11,11 @@ DEFAULT_SETTINGS = {
     "auto_clipboard": True,
     "clipboard_interval": 3000,
     "default_resolution": "720",
-    "default_audio_only": False
+    "default_audio_only": False,
+    "download_path": ""
 }
 
-THEMES = {  # Changed from THEME to THEMES
+THEMES = {
     "light": {
         "bg": "#f0f0f0",
         "sidebar_bg": "#e0e0e0",
