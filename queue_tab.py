@@ -3,7 +3,9 @@ from tkinter import ttk, filedialog, messagebox
 from downloader import Downloader
 from config import RESOLUTIONS
 from utils import save_history, load_queue, save_queue
+from datetime import datetime
 import threading
+
 
 class QueueTab:
     def __init__(self, parent, app):
@@ -82,6 +84,18 @@ class QueueTab:
         tk.Button(queue_btn_frame, text="Move Down", command=self.move_down, width=10).pack(side=tk.LEFT, padx=2)
         tk.Button(queue_btn_frame, text="Clear Queue", command=self.clear_queue, width=10).pack(side=tk.LEFT, padx=2)
         
+        # Stats Frame
+        stats_frame = tk.Frame(main_frame)
+        stats_frame.pack(fill=tk.X, pady=5)
+        
+        self.stats_label = tk.Label(
+            stats_frame, 
+            text="📊 Total: 0 | ⏳ Pending: 0 | ▶️ Downloading: 0 | ✅ Completed: 0 | ❌ Failed: 0", 
+            font=('Arial', 9), 
+            fg='gray'
+        )
+        self.stats_label.pack(side=tk.LEFT)
+        
         # Queue Action Buttons
         action_frame = tk.Frame(main_frame)
         action_frame.pack(fill=tk.X, pady=5)
@@ -145,32 +159,59 @@ class QueueTab:
             messagebox.showwarning("Warning", "Please select a save path")
             return
         
-        # Get video info
+        # Apply default settings from app settings
+        default_res = self.app.settings.get("default_resolution", "720")
+        default_audio = self.app.settings.get("default_audio_only", False)
+        
+        # If user hasn't changed resolution from default (720), use saved default
+        if self.res_var.get() == "720" and default_res != "720":
+            self.res_var.set(default_res)
+        
+        # If audio only not set by user, use saved default
+        if not self.audio_only.get() and default_audio:
+            self.audio_only.set(True)
+        
+        # Get video info with better error handling
         try:
+            self.info_label.config(text="Fetching video info...", fg='orange')
+            self.frame.update()
             info = self.downloader.get_info(self.url_var.get())
             title = info.get('title', 'Unknown')
-        except:
+            duration = info.get('duration', 0)
+            duration_str = f"{duration // 60}:{duration % 60:02d}" if duration else "Unknown"
+            self.info_label.config(text=f"📹 {title} ({duration_str})", fg='gray')
+        except Exception as e:
             title = self.url_var.get()[:50]
+            self.info_label.config(text="Could not fetch title, using URL", fg='orange')
         
+        # Create queue item
         queue_item = {
             "url": self.url_var.get(),
             "path": self.path_var.get(),
             "resolution": self.res_var.get(),
             "audio_only": self.audio_only.get(),
             "title": title,
-            "status": "pending"
+            "status": "pending",
+            "date_added": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
+        # Add to queue
         self.queue.append(queue_item)
         save_queue(self.queue)
         self.refresh_queue_display()
         
-        # Clear URL for next input
+        # Clear URL and reset to defaults for next input
         self.url_var.set("")
-        self.info_label.config(text="")
         
-        messagebox.showinfo("Success", f"Added to queue: {title}")
-    
+        # Reset to saved defaults for next addition
+        self.res_var.set(self.app.settings.get("default_resolution", "720"))
+        self.audio_only.set(self.app.settings.get("default_audio_only", False))
+        
+        # Show success message
+        messagebox.showinfo("Success", f"Added to queue: {title}\n\nQueue position: {len(self.queue)}")
+        
+        self.update_stats_display()
+        
     def remove_selected(self):
         selection = self.queue_listbox.curselection()
         if selection:
@@ -179,6 +220,7 @@ class QueueTab:
                 del self.queue[index]
                 save_queue(self.queue)
                 self.refresh_queue_display()
+                self.update_stats_display()
     
     def move_up(self):
         selection = self.queue_listbox.curselection()
@@ -188,6 +230,7 @@ class QueueTab:
             save_queue(self.queue)
             self.refresh_queue_display()
             self.queue_listbox.selection_set(index-1)
+            self.update_stats_display()
     
     def move_down(self):
         selection = self.queue_listbox.curselection()
@@ -197,21 +240,75 @@ class QueueTab:
             save_queue(self.queue)
             self.refresh_queue_display()
             self.queue_listbox.selection_set(index+1)
+            self.update_stats_display()
     
     def clear_queue(self):
         if messagebox.askyesno("Clear Queue", "Are you sure you want to clear the entire queue?"):
             self.queue = []
             save_queue(self.queue)
             self.refresh_queue_display()
+            self.update_stats_display()
+    
+    def get_queue_stats(self):
+        """Get queue statistics"""
+        total = len(self.queue)
+        pending = sum(1 for item in self.queue if item.get("status") == "pending")
+        downloading = sum(1 for item in self.queue if item.get("status") == "downloading")
+        completed = sum(1 for item in self.queue if item.get("status") == "completed")
+        failed = sum(1 for item in self.queue if item.get("status") == "failed")
+        
+        return {
+            "total": total,
+            "pending": pending,
+            "downloading": downloading,
+            "completed": completed,
+            "failed": failed
+        }
+    
+    def update_stats_display(self):
+        """Update the statistics display"""
+        stats = self.get_queue_stats()
+        self.stats_label.config(
+            text=f"📊 Total: {stats['total']} | ⏳ Pending: {stats['pending']} | "
+                 f"▶️ Downloading: {stats['downloading']} | ✅ Completed: {stats['completed']} | ❌ Failed: {stats['failed']}"
+        )
     
     def refresh_queue_display(self):
+        """Update the queue listbox display with better formatting"""
         self.queue_listbox.delete(0, tk.END)
-        for item in self.queue:
-            status_icon = "⏳" if item.get("status") == "pending" else "▶️" if item.get("status") == "downloading" else "✅" if item.get("status") == "completed" else "❌"
-            display_text = f"{status_icon} {item.get('title', 'Unknown')} - {item.get('resolution', 'N/A')}"
+        for i, item in enumerate(self.queue, 1):
+            status = item.get("status", "pending")
+            if status == "pending":
+                status_icon = "⏳"
+            elif status == "downloading":
+                status_icon = "▶️"
+            elif status == "completed":
+                status_icon = "✅"
+            elif status == "failed":
+                status_icon = "❌"
+            else:
+                status_icon = "❓"
+            
+            # Truncate long titles
+            title = item.get('title', 'Unknown')
+            if len(title) > 50:
+                title = title[:47] + "..."
+            
+            display_text = f"{i:2}. {status_icon} {title} - {item.get('resolution', 'N/A')}"
             if item.get('audio_only'):
                 display_text += " (Audio)"
+            
             self.queue_listbox.insert(tk.END, display_text)
+            
+            # Color code based on status
+            if status == "completed":
+                self.queue_listbox.itemconfig(i-1, fg='green')
+            elif status == "failed":
+                self.queue_listbox.itemconfig(i-1, fg='red')
+            elif status == "downloading":
+                self.queue_listbox.itemconfig(i-1, fg='blue')
+        
+        self.update_stats_display()
     
     def start_queue(self):
         """Start processing the queue"""
@@ -239,6 +336,7 @@ class QueueTab:
         self.start_btn.config(state='normal')
         self.stop_btn.config(state='disabled')
         self.status_label.config(text="Queue stopped by user")
+        self.update_stats_display()
     
     def process_queue(self):
         """Process items in the queue one by one"""
@@ -262,12 +360,14 @@ class QueueTab:
                 while item.get("status") == "downloading" and self.downloading:
                     import time
                     time.sleep(0.5)
+                    self.frame.after(0, self.update_stats_display)
         
         self.downloading = False
         self.frame.after(0, lambda: self.start_btn.config(state='normal'))
         self.frame.after(0, lambda: self.stop_btn.config(state='disabled'))
         self.frame.after(0, lambda: self.status_label.config(text="Queue processing completed!"))
         self.frame.after(0, lambda: self.current_title.config(text="No active download"))
+        self.frame.after(0, self.update_stats_display)
     
     def download_item(self, item):
         """Download a single queue item"""
@@ -353,6 +453,7 @@ class QueueTab:
     def show(self):
         self.frame.pack(fill=tk.BOTH, expand=True)
         self.refresh_queue_display()
+        self.update_stats_display()
     
     def hide(self):
         self.frame.pack_forget()

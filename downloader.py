@@ -90,6 +90,7 @@ class Downloader:
                 'no_color': True,
             }
 
+# Replace line 133-136 in downloader.py
             if audio_only:
                 ydl_opts.update({
                     'format': 'bestaudio/best',
@@ -102,7 +103,7 @@ class Downloader:
                 })
             else:
                 ydl_opts.update({
-                    'format': f'bestvideo[height<={resolution}]+bestaudio/best',
+                    'format': f'bestvideo[ext=mp4][height<={resolution}]+bestaudio[ext=m4a]/best[ext=mp4]/best',
                     'merge_output_format': 'mp4',
                 })
 
