@@ -1,11 +1,12 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from config import THEMES  # Changed from THEME to THEMES
+from config import THEMES
 from utils import load_settings, save_settings, detect_vlc
 from queue_tab import QueueTab
 from videos_tab import VideosTab
 from music_tab import MusicTab
 from settings_tab import SettingsTab
+import subprocess
 
 class App:
     def __init__(self, root):
@@ -25,6 +26,7 @@ class App:
         
         # Current active tab
         self.current_tab = None
+        self.last_clipboard = ""
         
         # Build UI
         self.build_ui()
@@ -32,13 +34,86 @@ class App:
         # Apply theme
         self.apply_theme()
         
-        # Start clipboard checking if enabled
-        if self.settings.get("auto_clipboard", True):
-            self.root.after(1000, self.check_clipboard)
+        # Start clipboard checking
+        self.root.after(1000, self.check_clipboard)
         
         # Set download path from settings if exists
         if self.settings.get("download_path"):
             self.queue_tab.path_var.set(self.settings["download_path"])
+    
+    def get_clipboard_text(self):
+        """
+        Read clipboard robustly for WSL, native Linux, and Windows.
+        Priority:
+          1. powershell.exe Get-Clipboard  (WSL1 & WSL2 — reads Windows clipboard directly)
+          2. tkinter clipboard_get()       (works under WSLg / native Linux with a display)
+          3. xclip / xsel                  (native Linux X11 fallback)
+        """
+        # 1. WSL: ask Windows PowerShell directly (most reliable in WSL)
+        try:
+            result = subprocess.run(
+                ['powershell.exe', '-NoProfile', '-Command', 'Get-Clipboard'],
+                capture_output=True, text=True, timeout=3
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+
+        # 2. tkinter clipboard_get() (works under WSLg with a real display)
+        try:
+            text = self.root.clipboard_get()
+            if text and text.strip():
+                return text.strip()
+        except Exception:
+            pass
+
+        # 3. xclip (native Linux / X11)
+        try:
+            result = subprocess.run(
+                ['xclip', '-selection', 'clipboard', '-o'],
+                capture_output=True, text=True, timeout=1
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+
+        # 4. xsel
+        try:
+            result = subprocess.run(
+                ['xsel', '--clipboard', '--output'],
+                capture_output=True, text=True, timeout=1
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+
+        return None
+    
+    def check_clipboard(self):
+        """Check clipboard for YouTube URLs"""
+        try:
+            clipboard_text = self.get_clipboard_text()
+            
+            if clipboard_text and clipboard_text != self.last_clipboard:
+                self.last_clipboard = clipboard_text
+                
+                # Check if it's a YouTube URL
+                if ('youtu.be' in clipboard_text or 'youtube.com' in clipboard_text):
+                    print(f"Found URL: {clipboard_text[:50]}...")
+                    
+                    # Always try to set the URL, regardless of current tab
+                    if hasattr(self, 'queue_tab'):
+                        self.queue_tab.url_var.set(clipboard_text)
+                        # Always auto preview (even if not on queue tab)
+                        self.root.after(500, self.queue_tab.preview)
+        except Exception as e:
+            print(f"Clipboard check error: {e}")
+        
+        # Check again every 2 seconds
+        self.root.after(2000, self.check_clipboard)
     
     def build_ui(self):
         """Build the main UI with sidebar and content area"""
@@ -122,10 +197,9 @@ class App:
     
     def show_tab(self, tab_name):
         """Show selected tab and hide others"""
-        # Update button styles - removed bg='' which was causing error
+        # Update button styles
         for name, btn in self.nav_buttons.items():
             btn.config(relief=tk.FLAT)
-            # Don't set bg to empty string, use default or theme color
             if hasattr(self, 'current_theme'):
                 theme = THEMES[self.current_theme]
                 btn.config(bg=theme["sidebar_bg"], fg=theme["fg"])
@@ -143,17 +217,14 @@ class App:
         if tab_name == "queue":
             self.queue_tab.show()
             self.title_label.config(text="📥 Download Queue")
-            # Refresh queue display
             self.queue_tab.refresh_queue_display()
         elif tab_name == "videos":
             self.videos_tab.show()
             self.title_label.config(text="📹 Video Library")
-            # Refresh video list
             self.videos_tab.refresh_list()
         elif tab_name == "music":
             self.music_tab.show()
             self.title_label.config(text="🎵 Music Library")
-            # Refresh music list
             self.music_tab.refresh_list()
         elif tab_name == "settings":
             self.settings_tab.show()
@@ -205,24 +276,6 @@ class App:
             self.videos_tab.apply_theme(theme)
             self.music_tab.apply_theme(theme)
             self.settings_tab.apply_theme(theme)
-    
-    def check_clipboard(self):
-        """Auto-detect URLs from clipboard"""
-        if not self.settings.get("auto_clipboard", True):
-            self.root.after(3000, self.check_clipboard)
-            return
-        
-        try:
-            text = self.root.clipboard_get()
-            if "http" in text or "youtu" in text:
-                # Only auto-fill if queue tab is showing and url entry exists
-                if self.current_tab == "queue":
-                    self.queue_tab.url_var.set(text)
-        except:
-            pass
-        
-        interval = self.settings.get("clipboard_interval", 3000)
-        self.root.after(interval, self.check_clipboard)
     
     def on_download_complete(self):
         """Called when a download completes - refresh library tabs"""

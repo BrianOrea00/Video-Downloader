@@ -5,5 +5,6 @@
     "auto_clipboard": true,
     "clipboard_interval": 3000,
     "default_resolution": "720",
-    "default_audio_only": false
+    "default_audio_only": false,
+    "download_path": "/home/arisu/Video-Downloader"
 }
