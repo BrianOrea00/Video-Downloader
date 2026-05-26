@@ -5,6 +5,7 @@ from config import RESOLUTIONS
 from utils import save_history, load_queue, save_queue
 from datetime import datetime
 import threading
+import subprocess
 
 
 class QueueTab:
@@ -19,15 +20,122 @@ class QueueTab:
         
         self.build_ui()
     
+    def create_context_menu(self, widget):
+        """Create right-click context menu for entry widgets"""
+        menu = tk.Menu(widget, tearoff=0)
+        menu.add_command(label="✂️ Cut", command=lambda: widget.event_generate("<<Cut>>"))
+        menu.add_command(label="📋 Copy", command=lambda: widget.event_generate("<<Copy>>"))
+        menu.add_command(label="📌 Paste", command=lambda: widget.event_generate("<<Paste>>"))
+        menu.add_separator()
+        menu.add_command(label="🔍 Select All", command=lambda: widget.select_range(0, tk.END))
+        
+        def show_menu(event):
+            menu.post(event.x_root, event.y_root)
+        
+        widget.bind("<Button-3>", show_menu)
+    
+    def get_clipboard_text(self):
+        """
+        Read clipboard robustly for WSL, native Linux, and Windows.
+        Priority:
+          1. powershell.exe Get-Clipboard  (WSL1 & WSL2 — reads Windows clipboard directly)
+          2. tkinter clipboard_get()       (works under WSLg / native Linux with a display)
+          3. xclip / xsel                  (native Linux X11 fallback)
+        """
+        # 1. WSL: ask Windows PowerShell directly (most reliable in WSL)
+        try:
+            result = subprocess.run(
+                ['powershell.exe', '-NoProfile', '-Command', 'Get-Clipboard'],
+                capture_output=True, text=True, timeout=3
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+
+        # 2. tkinter clipboard (works under WSLg with a real display)
+        try:
+            text = self.frame.clipboard_get()
+            if text and text.strip():
+                return text.strip()
+        except Exception:
+            pass
+
+        # 3. xclip
+        try:
+            result = subprocess.run(
+                ['xclip', '-selection', 'clipboard', '-o'],
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+
+        # 4. xsel
+        try:
+            result = subprocess.run(
+                ['xsel', '--clipboard', '--output'],
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+
+        return None
+
+    def paste_from_clipboard(self):
+        """Paste URL from clipboard using the Paste button"""
+        url = self.get_clipboard_text()
+        if url:
+            self.url_var.set(url)
+            self.url_entry.icursor(tk.END)
+            self.preview()
+        else:
+            messagebox.showerror(
+                "Clipboard Error",
+                "Could not read clipboard.\n\n"
+                "Try clicking inside the URL box and pressing Ctrl+V,\n"
+                "or type/paste the URL manually."
+            )
+    
     def build_ui(self):
         main_frame = tk.Frame(self.frame, padx=20, pady=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # URL Input Section
+        # URL Input Section with Paste button
         tk.Label(main_frame, text="Video URL:", font=('Arial', 10, 'bold')).pack(anchor=tk.W)
+        
+        url_frame = tk.Frame(main_frame)
+        url_frame.pack(fill=tk.X, pady=(5, 10))
+        
         self.url_var = tk.StringVar()
-        url_entry = tk.Entry(main_frame, textvariable=self.url_var, width=70, font=('Arial', 10))
-        url_entry.pack(fill=tk.X, pady=(5, 10))
+        self.url_entry = tk.Entry(url_frame, textvariable=self.url_var, width=70, font=('Arial', 10))
+        self.url_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.create_context_menu(self.url_entry)
+
+        # Fix Ctrl+V for WSL and Linux:
+        # - In WSL, tkinter's default paste can't reach the Windows clipboard.
+        # - On native Linux, default paste uses PRIMARY (mouse highlight) not CLIPBOARD.
+        # We override it to use get_clipboard_text() which handles both cases.
+        def force_paste(event=None):
+            text = self.get_clipboard_text()
+            if text:
+                try:
+                    sel_start = self.url_entry.index(tk.SEL_FIRST)
+                    sel_end = self.url_entry.index(tk.SEL_LAST)
+                    self.url_entry.delete(sel_start, sel_end)
+                except tk.TclError:
+                    pass
+                self.url_entry.insert(tk.INSERT, text)
+            return "break"  # Suppress tkinter's default paste
+
+        self.url_entry.bind("<Control-v>", force_paste)
+        self.url_entry.bind("<Control-V>", force_paste)
+        
+        paste_btn = tk.Button(url_frame, text="📋 Paste", command=self.paste_from_clipboard, width=8, bg='#2196F3', fg='white')
+        paste_btn.pack(side=tk.RIGHT, padx=(5, 0))
         
         # Save Path
         tk.Label(main_frame, text="Save Path:", font=('Arial', 10, 'bold')).pack(anchor=tk.W)
@@ -35,7 +143,10 @@ class QueueTab:
         path_frame.pack(fill=tk.X, pady=(5, 10))
         
         self.path_var = tk.StringVar()
-        tk.Entry(path_frame, textvariable=self.path_var, width=55, font=('Arial', 10)).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.path_entry = tk.Entry(path_frame, textvariable=self.path_var, width=55, font=('Arial', 10))
+        self.path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.create_context_menu(self.path_entry)
+        
         tk.Button(path_frame, text="Browse", command=self.browse, width=10).pack(side=tk.LEFT, padx=(5, 0))
         
         # Download Options
@@ -211,7 +322,7 @@ class QueueTab:
         messagebox.showinfo("Success", f"Added to queue: {title}\n\nQueue position: {len(self.queue)}")
         
         self.update_stats_display()
-        
+    
     def remove_selected(self):
         selection = self.queue_listbox.curselection()
         if selection:
@@ -454,6 +565,9 @@ class QueueTab:
         self.frame.pack(fill=tk.BOTH, expand=True)
         self.refresh_queue_display()
         self.update_stats_display()
+        # Focus the URL entry for quick pasting
+        if hasattr(self, 'url_entry'):
+            self.url_entry.focus_set()
     
     def hide(self):
         self.frame.pack_forget()
