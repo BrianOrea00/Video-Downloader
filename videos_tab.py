@@ -1,151 +1,172 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
+import customtkinter as ctk
+from tkinter import messagebox
 import os
 import subprocess
 from datetime import datetime
+from icon_manager import icon_manager
+from theme_manager import theme_manager
+
 
 class VideosTab:
     def __init__(self, parent, app):
         self.parent = parent
         self.app = app
-        self.frame = tk.Frame(parent)
+        self.frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.current_files = []
         self.vlc_path = None
         
         self.build_ui()
     
     def build_ui(self):
-        # Main container
-        main_frame = tk.Frame(self.frame, padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Top bar with refresh and info
-        top_frame = tk.Frame(main_frame)
-        top_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.info_label = tk.Label(top_frame, text="Video Library", font=('Arial', 10, 'bold'))
-        self.info_label.pack(side=tk.LEFT)
-        
-        self.refresh_btn = tk.Button(
-            top_frame, 
-            text="🔄 Refresh", 
-            command=self.refresh_files,  # Changed to refresh_files
-            width=10
+        # Top Bar Card
+        self.top_card = ctk.CTkFrame(
+            self.frame,
+            fg_color=theme_manager.get_color("card"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=10
         )
-        self.refresh_btn.pack(side=tk.RIGHT, padx=5)
+        self.top_card.pack(fill="x", pady=(0, 16))
         
-        self.path_label = tk.Label(
-            top_frame, 
-            text="No download folder selected", 
-            font=('Arial', 9), 
-            fg='gray'
+        top_inner = ctk.CTkFrame(self.top_card, fg_color="transparent")
+        top_inner.pack(fill="x", padx=14, pady=12)
+        
+        # Path display
+        path_frame = ctk.CTkFrame(top_inner, fg_color="transparent")
+        path_frame.pack(side="left", fill="x", expand=True)
+        
+        folder_icon = ctk.CTkLabel(
+            path_frame,
+            text="",
+            image=icon_manager.get("folder"),
+            width=20,
+            height=20
         )
-        self.path_label.pack(side=tk.RIGHT, padx=10)
+        folder_icon.pack(side="left", padx=(0, 8))
         
-        # Search bar
-        search_frame = tk.Frame(main_frame)
-        search_frame.pack(fill=tk.X, pady=(0, 10))
+        self.path_label = ctk.CTkLabel(
+            path_frame,
+            text="No download folder selected",
+            font=ctk.CTkFont(family="monospace", size=11),
+            text_color=theme_manager.get_color("muted")
+        )
+        self.path_label.pack(side="left")
         
-        tk.Label(search_frame, text="🔍 Search:", font=('Arial', 10)).pack(side=tk.LEFT)
-        self.search_var = tk.StringVar()
+        # Search
+        search_frame = ctk.CTkFrame(top_inner, fg_color="transparent")
+        search_frame.pack(side="right")
+        
+        self.search_var = ctk.StringVar()
         self.search_var.trace('w', lambda *args: self.filter_files())
-        search_entry = tk.Entry(search_frame, textvariable=self.search_var, width=40)
-        search_entry.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Create Treeview for file list
-        list_frame = tk.Frame(main_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
-        # Scrollbars
-        v_scrollbar = tk.Scrollbar(list_frame)
-        v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        h_scrollbar = tk.Scrollbar(list_frame, orient=tk.HORIZONTAL)
-        h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
-        
-        # Treeview
-        columns = ("Filename", "Size", "Modified", "Actions")
-        self.tree = ttk.Treeview(
-            list_frame, 
-            columns=columns, 
-            show='headings',
-            yscrollcommand=v_scrollbar.set,
-            xscrollcommand=h_scrollbar.set,
-            height=15
+        search_entry = ctk.CTkEntry(
+            search_frame,
+            textvariable=self.search_var,
+            placeholder_text="Search...",
+            width=200,
+            height=32,
+            fg_color=theme_manager.get_color("surface"),
+            border_color=theme_manager.get_color("border"),
+            placeholder_text_color=theme_manager.get_color("muted")
         )
+        search_entry.pack(side="left", padx=(0, 8))
         
-        self.tree.heading("Filename", text="Video File")
-        self.tree.heading("Size", text="Size")
-        self.tree.heading("Modified", text="Date Modified")
-        self.tree.heading("Actions", text="Actions")
+        refresh_btn = ctk.CTkButton(
+            search_frame,
+            text="",
+            image=icon_manager.get("refresh"),
+            width=32,
+            height=32,
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("muted"),
+            hover_color=theme_manager.get_color("card"),
+            corner_radius=6,
+            command=self.refresh_files
+        )
+        refresh_btn.pack(side="left")
         
-        self.tree.column("Filename", width=400)
-        self.tree.column("Size", width=100)
-        self.tree.column("Modified", width=150)
-        self.tree.column("Actions", width=100)
+        # File List Container
+        self.list_container = ctk.CTkScrollableFrame(
+            self.frame,
+            fg_color="transparent",
+            scrollbar_button_color=theme_manager.get_color("accent"),
+            scrollbar_button_hover_color=theme_manager.get_color("surface")
+        )
+        self.list_container.pack(fill="both", expand=True)
         
-        self.tree.pack(fill=tk.BOTH, expand=True)
+        # Empty state (initially hidden)
+        self.empty_state = ctk.CTkFrame(self.list_container, fg_color="transparent")
         
-        v_scrollbar.config(command=self.tree.yview)
-        h_scrollbar.config(command=self.tree.xview)
+        empty_icon = ctk.CTkLabel(
+            self.empty_state,
+            text="[ ]",
+            font=ctk.CTkFont(size=32),
+            text_color=theme_manager.get_color("muted")
+        )
+        empty_icon.pack(pady=(40, 16))
         
-        # Bind double-click to play
-        self.tree.bind('<Double-Button-1>', self.on_double_click)
+        empty_title = ctk.CTkLabel(
+            self.empty_state,
+            text="No videos found",
+            font=ctk.CTkFont(size=14),
+            text_color=theme_manager.get_color("greige")
+        )
+        empty_title.pack()
         
-        # Right-click menu
-        self.context_menu = tk.Menu(self.tree, tearoff=0)
-        self.context_menu.add_command(label="▶ Play in VLC", command=self.play_selected)
-        self.context_menu.add_command(label="📂 Open Folder", command=self.open_folder)
-        self.context_menu.add_separator()
-        self.context_menu.add_command(label="🗑 Delete File", command=self.delete_selected)
-        
-        self.tree.bind('<Button-3>', self.show_context_menu)
+        empty_sub = ctk.CTkLabel(
+            self.empty_state,
+            text="Select a download folder in Queue tab",
+            font=ctk.CTkFont(size=12),
+            text_color=theme_manager.get_color("muted")
+        )
+        empty_sub.pack()
         
         # Status bar
-        self.status_bar = tk.Label(
-            main_frame, 
-            text="Ready", 
-            font=('Arial', 9), 
-            fg='gray',
-            anchor=tk.W
+        self.status_bar = ctk.CTkLabel(
+            self.frame,
+            text="Ready",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("secondary")
         )
-        self.status_bar.pack(fill=tk.X, pady=(10, 0))
+        self.status_bar.pack(fill="x", pady=(12, 0))
     
     def get_download_path(self):
-        """Get the current download path from queue tab"""
         if hasattr(self.app, 'queue_tab'):
             path = self.app.queue_tab.path_var.get()
             if path and os.path.exists(path):
                 return path
         return None
     
+    def format_size(self, size_bytes):
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.1f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.1f} TB"
+    
     def refresh_files(self):
-        """Refresh the video list (actual scanning)"""
         download_path = self.get_download_path()
         
         if not download_path:
-            self.path_label.config(text="No download folder selected", fg='orange')
-            self.status_bar.config(text="Please select a download folder in Queue tab")
-            # Clear tree
-            for item in self.tree.get_children():
-                self.tree.delete(item)
+            self.path_label.configure(text="No download folder selected")
+            self.status_bar.configure(text="Please select a download folder in Queue tab")
+            self.show_empty_state()
             return
         
-        self.path_label.config(text=f"📁 {download_path}", fg='green')
-        self.status_bar.config(text="Scanning for videos...")
+        self.path_label.configure(text=download_path, text_color=theme_manager.get_color("text_primary"))
+        self.status_bar.configure(text="Scanning for videos...")
         self.frame.update()
         
-        # Video extensions
         video_extensions = ('.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv')
         
-        # Scan directory
         self.current_files = []
         try:
             for filename in os.listdir(download_path):
                 if filename.lower().endswith(video_extensions):
                     filepath = os.path.join(download_path, filename)
                     if os.path.isfile(filepath):
-                        # Get file info
                         stat = os.stat(filepath)
                         size = self.format_size(stat.st_size)
                         modified = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M')
@@ -158,85 +179,164 @@ class VideosTab:
                             'size_bytes': stat.st_size
                         })
             
-            # Sort by modified date (newest first)
             self.current_files.sort(key=lambda x: x['size_bytes'], reverse=True)
-            
             self.filter_files()
-            self.status_bar.config(text=f"Found {len(self.current_files)} video files")
+            self.status_bar.configure(text=f"Found {len(self.current_files)} video files")
             
         except Exception as e:
-            self.status_bar.config(text=f"Error scanning: {str(e)}")
-            messagebox.showerror("Scan Error", f"Failed to scan folder:\n{str(e)}")
+            self.status_bar.configure(text=f"Error scanning: {str(e)}")
+            self.show_empty_state()
+    
+    def show_empty_state(self):
+        for widget in self.list_container.winfo_children():
+            widget.destroy()
+        self.empty_state.pack(fill="both", expand=True)
+    
+    def hide_empty_state(self):
+        self.empty_state.pack_forget()
     
     def filter_files(self):
-        """Filter files based on search query"""
         search_term = self.search_var.get().lower()
         
-        # Clear tree
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        for widget in self.list_container.winfo_children():
+            if widget != self.empty_state:
+                widget.destroy()
         
-        # Add filtered files
-        for file_info in self.current_files:
-            if search_term in file_info['name'].lower():
-                self.tree.insert('', 'end', values=(
-                    file_info['name'],
-                    file_info['size'],
-                    file_info['modified'],
-                    "▶️ Play"
-                ), tags=(file_info['path'],))
-    
-    def format_size(self, size_bytes):
-        """Format file size to human readable"""
-        for unit in ['B', 'KB', 'MB', 'GB']:
-            if size_bytes < 1024.0:
-                return f"{size_bytes:.1f} {unit}"
-            size_bytes /= 1024.0
-        return f"{size_bytes:.1f} TB"
-    
-    def on_double_click(self, event):
-        """Handle double-click on item"""
-        self.play_selected()
-    
-    def show_context_menu(self, event):
-        """Show right-click context menu"""
-        item = self.tree.identify_row(event.y)
-        if item:
-            self.tree.selection_set(item)
-            self.context_menu.post(event.x_root, event.y_root)
-    
-    def play_selected(self):
-        """Play selected video in VLC"""
-        selection = self.tree.selection()
-        if not selection:
-            messagebox.showwarning("Warning", "Please select a video first")
+        filtered = [f for f in self.current_files if search_term in f['name'].lower()]
+        
+        if not filtered:
+            self.show_empty_state()
             return
         
-        # Get file path from selected item
-        item = selection[0]
-        values = self.tree.item(item, 'values')
-        filename = values[0]
-        download_path = self.get_download_path()
+        self.hide_empty_state()
         
-        if not download_path:
-            messagebox.showerror("Error", "Download folder not found")
-            return
+        for file_info in filtered:
+            self.create_file_row(file_info)
+    
+    def create_file_row(self, file_info):
+        row = ctk.CTkFrame(
+            self.list_container,
+            fg_color=theme_manager.get_color("card"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=8
+        )
+        row.pack(fill="x", pady=4)
         
-        filepath = os.path.join(download_path, filename)
+        # Icon
+        icon_frame = ctk.CTkFrame(row, width=40, fg_color="transparent")
+        icon_frame.pack(side="left", padx=12, pady=12)
+        icon_frame.pack_propagate(False)
         
+        icon_label = ctk.CTkLabel(
+            icon_frame,
+            text="",
+            image=icon_manager.get("video_sm"),
+        )
+        icon_label.pack()
+        
+        # Info section
+        info_frame = ctk.CTkFrame(row, fg_color="transparent")
+        info_frame.pack(side="left", fill="x", expand=True, padx=(0, 12), pady=12)
+        
+        filename = file_info['name']
+        if len(filename) > 50:
+            filename = filename[:47] + "..."
+        
+        name_label = ctk.CTkLabel(
+            info_frame,
+            text=filename,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=theme_manager.get_color("text_primary"),
+            anchor="w"
+        )
+        name_label.pack(anchor="w")
+        
+        # Chips
+        chips_frame = ctk.CTkFrame(info_frame, fg_color="transparent")
+        chips_frame.pack(anchor="w", pady=(4, 0))
+        
+        # Size chip
+        size_chip = ctk.CTkFrame(
+            chips_frame,
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=4
+        )
+        size_chip.pack(side="left", padx=(0, 6))
+        
+        size_label = ctk.CTkLabel(
+            size_chip,
+            text=file_info['size'],
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("greige")
+        )
+        size_label.pack(padx=6, pady=2)
+        
+        # Date chip
+        date_chip = ctk.CTkFrame(
+            chips_frame,
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=4
+        )
+        date_chip.pack(side="left")
+        
+        date_label = ctk.CTkLabel(
+            date_chip,
+            text=file_info['modified'],
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("greige")
+        )
+        date_label.pack(padx=6, pady=2)
+        
+        # Actions
+        actions_frame = ctk.CTkFrame(row, fg_color="transparent")
+        actions_frame.pack(side="right", padx=12, pady=12)
+        
+        play_btn = ctk.CTkButton(
+            actions_frame,
+            text="",
+            image=icon_manager.get("play_sm"),
+            width=32,
+            height=28,
+            fg_color=theme_manager.get_color("accent"),
+            text_color="#FFFFFF",
+            corner_radius=6,
+            command=lambda p=file_info['path'], n=file_info['name']: self.play_file(p, n)
+        )
+        play_btn.pack(side="left", padx=2)
+        
+        delete_btn = ctk.CTkButton(
+            actions_frame,
+            text="",
+            image=icon_manager.get("trash_sm"),
+            width=32,
+            height=28,
+            fg_color="transparent",
+            border_width=1,
+            border_color=theme_manager.get_color("error"),
+            text_color=theme_manager.get_color("error"),
+            hover_color=theme_manager.get_color("surface"),
+            corner_radius=6,
+            command=lambda p=file_info['path'], n=file_info['name']: self.delete_file(p, n)
+        )
+        delete_btn.pack(side="left", padx=2)
+    
+    def play_file(self, filepath, filename):
         if not os.path.exists(filepath):
             messagebox.showerror("Error", "File not found")
             self.refresh_files()
             return
         
-        # Get VLC path from app
         vlc_path = self.app.vlc_path
         
         try:
             if vlc_path and os.path.exists(vlc_path):
                 subprocess.Popen([vlc_path, filepath])
             else:
-                # Try system default
                 import sys
                 if sys.platform == "win32":
                     os.startfile(filepath)
@@ -244,77 +344,25 @@ class VideosTab:
                     subprocess.Popen(["open", filepath])
                 else:
                     subprocess.Popen(["xdg-open", filepath])
-            self.status_bar.config(text=f"Playing: {filename}")
+            self.status_bar.configure(text=f"Playing: {filename}")
         except Exception as e:
             messagebox.showerror("Play Error", f"Failed to play video:\n{str(e)}")
     
-    def open_folder(self):
-        """Open folder containing the selected video"""
-        download_path = self.get_download_path()
-        if download_path and os.path.exists(download_path):
-            import sys
-            if sys.platform == "win32":
-                os.startfile(download_path)
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", download_path])
-            else:
-                subprocess.Popen(["xdg-open", download_path])
-    
-    def delete_selected(self):
-        """Delete selected video file"""
-        selection = self.tree.selection()
-        if not selection:
-            messagebox.showwarning("Warning", "Please select a video first")
-            return
-        
-        item = selection[0]
-        values = self.tree.item(item, 'values')
-        filename = values[0]
-        download_path = self.get_download_path()
-        filepath = os.path.join(download_path, filename)
-        
-        # Confirm deletion
-        if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete:\n{filename}\n\nThis action cannot be undone!"):
+    def delete_file(self, filepath, filename):
+        if messagebox.askyesno("Confirm Delete", f"Delete '{filename}'?\n\nThis action cannot be undone!"):
             try:
                 os.remove(filepath)
-                self.status_bar.config(text=f"Deleted: {filename}")
-                self.refresh_files()  # Changed to refresh_files
-                messagebox.showinfo("Success", f"Deleted: {filename}")
+                self.status_bar.configure(text=f"Deleted: {filename}")
+                self.refresh_files()
             except Exception as e:
                 messagebox.showerror("Delete Error", f"Failed to delete file:\n{str(e)}")
     
     def show(self):
-        self.frame.pack(fill=tk.BOTH, expand=True)
-        self.refresh_files()  # Changed to refresh_files
+        self.frame.pack(fill="both", expand=True)
+        self.refresh_files()
     
     def hide(self):
         self.frame.pack_forget()
     
     def refresh_list(self):
-        """Public method to refresh the list - called from ui.py"""
-        self.refresh_files()  # Call the actual scanning method
-    
-    def apply_theme(self, theme):
-        self.frame.configure(bg=theme["bg"])
-        for widget in self.frame.winfo_children():
-            self.apply_theme_to_widget(widget, theme)
-    
-    def apply_theme_to_widget(self, widget, theme):
-        try:
-            if isinstance(widget, (tk.Frame, tk.Label)):
-                widget.configure(bg=theme["bg"])
-                if isinstance(widget, tk.Label):
-                    current_fg = widget.cget("fg")
-                    if current_fg not in ["orange", "red", "gray", "green", "#ffa500", "#ff0000", "#808080"]:
-                        widget.configure(fg=theme["fg"])
-            elif isinstance(widget, tk.Button):
-                current_bg = widget.cget("bg")
-                if current_bg not in ["#2196F3", "#4CAF50", "#f44336"]:
-                    widget.configure(bg=theme["button_bg"], fg=theme["button_fg"])
-            elif isinstance(widget, tk.Entry):
-                widget.configure(bg=theme["entry_bg"], fg=theme["entry_fg"])
-        except:
-            pass
-        
-        for child in widget.winfo_children():
-            self.apply_theme_to_widget(child, theme)
+        self.refresh_files()
