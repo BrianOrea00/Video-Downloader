@@ -1,48 +1,32 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+import customtkinter as ctk
+from tkinter import messagebox
 from downloader import Downloader
 from config import RESOLUTIONS
 from utils import save_history, load_queue, save_queue
+from icon_manager import icon_manager
+from theme_manager import theme_manager
 from datetime import datetime
 import threading
 import subprocess
+import tkinter as tk
+import os
 
 
 class QueueTab:
     def __init__(self, parent, app):
         self.parent = parent
         self.app = app
-        self.frame = tk.Frame(parent)
+        self.frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.downloader = Downloader()
         self.queue = load_queue()
         self.downloading = False
         self.active_downloads = []
+        self.current_download_item = None
         
         self.build_ui()
     
-    def create_context_menu(self, widget):
-        """Create right-click context menu for entry widgets"""
-        menu = tk.Menu(widget, tearoff=0)
-        menu.add_command(label="✂️ Cut", command=lambda: widget.event_generate("<<Cut>>"))
-        menu.add_command(label="📋 Copy", command=lambda: widget.event_generate("<<Copy>>"))
-        menu.add_command(label="📌 Paste", command=lambda: widget.event_generate("<<Paste>>"))
-        menu.add_separator()
-        menu.add_command(label="🔍 Select All", command=lambda: widget.select_range(0, tk.END))
-        
-        def show_menu(event):
-            menu.post(event.x_root, event.y_root)
-        
-        widget.bind("<Button-3>", show_menu)
-    
     def get_clipboard_text(self):
-        """
-        Read clipboard robustly for WSL, native Linux, and Windows.
-        Priority:
-          1. powershell.exe Get-Clipboard  (WSL1 & WSL2 — reads Windows clipboard directly)
-          2. tkinter clipboard_get()       (works under WSLg / native Linux with a display)
-          3. xclip / xsel                  (native Linux X11 fallback)
-        """
-        # 1. WSL: ask Windows PowerShell directly (most reliable in WSL)
+        """Read clipboard robustly"""
         try:
             result = subprocess.run(
                 ['powershell.exe', '-NoProfile', '-Command', 'Get-Clipboard'],
@@ -53,7 +37,6 @@ class QueueTab:
         except Exception:
             pass
 
-        # 2. tkinter clipboard (works under WSLg with a real display)
         try:
             text = self.frame.clipboard_get()
             if text and text.strip():
@@ -61,7 +44,6 @@ class QueueTab:
         except Exception:
             pass
 
-        # 3. xclip
         try:
             result = subprocess.run(
                 ['xclip', '-selection', 'clipboard', '-o'],
@@ -72,7 +54,6 @@ class QueueTab:
         except Exception:
             pass
 
-        # 4. xsel
         try:
             result = subprocess.run(
                 ['xsel', '--clipboard', '--output'],
@@ -84,165 +65,385 @@ class QueueTab:
             pass
 
         return None
-
+    
+    def build_ui(self):
+        # Main container
+        self.main_frame = ctk.CTkScrollableFrame(self.frame, fg_color="transparent")
+        self.main_frame.pack(fill="both", expand=True)
+        
+        # URL Input Card
+        self.input_card = ctk.CTkFrame(
+            self.main_frame,
+            fg_color=theme_manager.get_color("card"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=10
+        )
+        self.input_card.pack(fill="x", pady=(0, 16))
+        
+        # Card header
+        input_header = ctk.CTkFrame(self.input_card, fg_color="transparent")
+        input_header.pack(fill="x", padx=14, pady=(12, 8))
+        
+        section_label = ctk.CTkLabel(
+            input_header,
+            text="ADD URL",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("secondary")
+        )
+        section_label.pack(anchor="w")
+        
+        # URL row
+        url_frame = ctk.CTkFrame(self.input_card, fg_color="transparent")
+        url_frame.pack(fill="x", padx=14, pady=(0, 10))
+        
+        self.url_var = ctk.StringVar()
+        self.url_entry = ctk.CTkEntry(
+            url_frame,
+            textvariable=self.url_var,
+            placeholder_text="https://youtube.com/watch?v=...",
+            font=ctk.CTkFont(family="monospace", size=12),
+            fg_color=theme_manager.get_color("surface"),
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("text_primary"),
+            placeholder_text_color=theme_manager.get_color("muted")
+        )
+        self.url_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        
+        paste_btn = ctk.CTkButton(
+            url_frame,
+            text="Paste",
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("muted"),
+            hover_color=theme_manager.get_color("card"),
+            width=80,
+            height=36,
+            corner_radius=6,
+            command=self.paste_from_clipboard
+        )
+        paste_btn.pack(side="left", padx=(0, 8))
+        
+        add_btn = ctk.CTkButton(
+            url_frame,
+            text="Add to Queue",
+            fg_color=theme_manager.get_color("accent"),
+            text_color="#FFFFFF",
+            width=120,
+            height=36,
+            corner_radius=6,
+            command=self.add_to_queue
+        )
+        add_btn.pack(side="left")
+        
+        # Options row (pill buttons)
+        options_frame = ctk.CTkFrame(self.input_card, fg_color="transparent")
+        options_frame.pack(fill="x", padx=14, pady=(0, 10))
+        
+        # Resolution pills
+        self.res_pills = {}
+        res_pill_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
+        res_pill_frame.pack(side="left", padx=(0, 10))
+        
+        self.res_var = ctk.StringVar(value="720")
+        
+        for res in ["720", "1080"]:
+            pill = ctk.CTkButton(
+                res_pill_frame,
+                text=f"{res}p",
+                fg_color=theme_manager.get_color("surface"),
+                border_width=1,
+                border_color=theme_manager.get_color("border"),
+                text_color=theme_manager.get_color("greige"),
+                hover_color=theme_manager.get_color("card"),
+                width=50,
+                height=28,
+                corner_radius=14,
+                font=ctk.CTkFont(size=12),
+                command=lambda r=res: self.set_resolution(r)
+            )
+            pill.pack(side="left", padx=2)
+            self.res_pills[res] = pill
+        
+        # Audio pill
+        self.audio_only = ctk.BooleanVar(value=False)
+        self.audio_pill = ctk.CTkButton(
+            options_frame,
+            text="Audio Only",
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("greige"),
+            hover_color=theme_manager.get_color("card"),
+            width=100,
+            height=28,
+            corner_radius=14,
+            font=ctk.CTkFont(size=12),
+            command=self.toggle_audio
+        )
+        self.audio_pill.pack(side="left")
+        
+        # Path row
+        path_frame = ctk.CTkFrame(self.input_card, fg_color="transparent")
+        path_frame.pack(fill="x", padx=14, pady=(0, 14))
+        
+        path_bg = ctk.CTkFrame(
+            path_frame,
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=6
+        )
+        path_bg.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        
+        folder_icon = ctk.CTkLabel(
+            path_bg,
+            text="",
+            image=icon_manager.get("folder"),
+            width=20,
+            height=20
+        )
+        folder_icon.pack(side="left", padx=(10, 5), pady=8)
+        
+        self.path_var = ctk.StringVar()
+        self.path_label = ctk.CTkLabel(
+            path_bg,
+            text="Select download folder...",
+            font=ctk.CTkFont(family="monospace", size=11),
+            text_color=theme_manager.get_color("muted"),
+            anchor="w"
+        )
+        self.path_label.pack(side="left", fill="x", expand=True, pady=8)
+        
+        browse_btn = ctk.CTkButton(
+            path_frame,
+            text="Browse",
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("muted"),
+            hover_color=theme_manager.get_color("card"),
+            width=80,
+            height=36,
+            corner_radius=6,
+            command=self.browse
+        )
+        browse_btn.pack(side="left")
+        
+        # Active Download Card
+        self.active_card = ctk.CTkFrame(
+            self.main_frame,
+            fg_color=theme_manager.get_color("card"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=10
+        )
+        
+        self.active_title_label = ctk.CTkLabel(
+            self.active_card,
+            text="No active download",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=theme_manager.get_color("text_primary")
+        )
+        self.active_title_label.pack(anchor="w", padx=14, pady=(12, 8))
+        
+        # Progress bar
+        self.progress_bar = ctk.CTkProgressBar(
+            self.active_card,
+            height=5,
+            fg_color=theme_manager.get_color("border"),
+            progress_color=theme_manager.get_color("warning")
+        )
+        self.progress_bar.pack(fill="x", padx=14, pady=(0, 8))
+        self.progress_bar.set(0)
+        
+        # Progress stats row
+        stats_row = ctk.CTkFrame(self.active_card, fg_color="transparent")
+        stats_row.pack(fill="x", padx=14, pady=(0, 10))
+        
+        self.bytes_label = ctk.CTkLabel(
+            stats_row,
+            text="0 MB / 0 MB",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("greige")
+        )
+        self.bytes_label.pack(side="left")
+        
+        self.percent_label = ctk.CTkLabel(
+            stats_row,
+            text="0%",
+            font=ctk.CTkFont(family="monospace", size=11),
+            text_color=theme_manager.get_color("greige")
+        )
+        self.percent_label.pack(side="right")
+        
+        # Speed and ETA row
+        speed_eta_row = ctk.CTkFrame(self.active_card, fg_color="transparent")
+        speed_eta_row.pack(fill="x", padx=14, pady=(0, 12))
+        
+        self.speed_label = ctk.CTkLabel(
+            speed_eta_row,
+            text="",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("muted")
+        )
+        self.speed_label.pack(side="left")
+        
+        self.eta_label = ctk.CTkLabel(
+            speed_eta_row,
+            text="",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("muted")
+        )
+        self.eta_label.pack(side="right")
+        
+        self.active_card.pack_forget()
+        
+        # Stats chips row
+        chips_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        chips_frame.pack(fill="x", pady=(0, 12))
+        
+        stats = [
+            ("Total", "0"),
+            ("Pending", "0"),
+            ("Active", "0"),
+            ("Done", "0"),
+        ]
+        
+        self.stat_chips = {}
+        for label, value in stats:
+            chip = ctk.CTkFrame(
+                chips_frame,
+                fg_color=theme_manager.get_color("surface"),
+                border_width=1,
+                border_color=theme_manager.get_color("border"),
+                corner_radius=4
+            )
+            chip.pack(side="left", padx=4)
+            
+            chip_label = ctk.CTkLabel(
+                chip,
+                text=f"{label}: {value}",
+                font=ctk.CTkFont(size=11),
+                text_color=theme_manager.get_color("greige")
+            )
+            chip_label.pack(padx=8, pady=3)
+            self.stat_chips[label] = chip_label
+        
+        # Queue List - CTkScrollableFrame with row cards
+        queue_label = ctk.CTkLabel(
+            self.main_frame,
+            text="QUEUE",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("secondary")
+        )
+        queue_label.pack(anchor="w", pady=(0, 8))
+        
+        self.queue_container = ctk.CTkScrollableFrame(
+            self.main_frame,
+            fg_color="transparent",
+            scrollbar_button_color=theme_manager.get_color("accent"),
+            scrollbar_button_hover_color=theme_manager.get_color("surface")
+        )
+        self.queue_container.pack(fill="both", expand=True, pady=(0, 12))
+        
+        # Action Buttons
+        action_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        action_frame.pack(fill="x", pady=(0, 0))
+        
+        self.start_btn = ctk.CTkButton(
+            action_frame,
+            text="Start Queue",
+            fg_color=theme_manager.get_color("accent"),
+            text_color="#FFFFFF",
+            height=36,
+            corner_radius=6,
+            command=self.start_queue
+        )
+        self.start_btn.pack(side="left", padx=4)
+        
+        self.stop_btn = ctk.CTkButton(
+            action_frame,
+            text="Stop",
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("error"),
+            text_color=theme_manager.get_color("error"),
+            height=36,
+            corner_radius=6,
+            state="disabled",
+            command=self.stop_queue
+        )
+        self.stop_btn.pack(side="left", padx=4)
+        
+        clear_completed_btn = ctk.CTkButton(
+            action_frame,
+            text="Clear Completed",
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("greige"),
+            height=36,
+            corner_radius=6,
+            command=self.clear_completed
+        )
+        clear_completed_btn.pack(side="left", padx=4)
+    
+    def set_resolution(self, res):
+        """Set resolution and update pill styling"""
+        self.res_var.set(res)
+        for pill_res, pill in self.res_pills.items():
+            if pill_res == res:
+                pill.configure(
+                    border_color=theme_manager.get_color("accent"),
+                    text_color=theme_manager.get_color("accent"),
+                    fg_color="#0A2822"
+                )
+            else:
+                pill.configure(
+                    border_color=theme_manager.get_color("border"),
+                    text_color=theme_manager.get_color("greige"),
+                    fg_color=theme_manager.get_color("surface")
+                )
+    
+    def toggle_audio(self):
+        """Toggle audio only mode"""
+        current = self.audio_only.get()
+        self.audio_only.set(not current)
+        if self.audio_only.get():
+            self.audio_pill.configure(
+                border_color=theme_manager.get_color("accent"),
+                text_color=theme_manager.get_color("accent"),
+                fg_color="#0A2822"
+            )
+        else:
+            self.audio_pill.configure(
+                border_color=theme_manager.get_color("border"),
+                text_color=theme_manager.get_color("greige"),
+                fg_color=theme_manager.get_color("surface")
+            )
+    
     def paste_from_clipboard(self):
-        """Paste URL from clipboard using the Paste button"""
+        """Paste URL from clipboard"""
         url = self.get_clipboard_text()
         if url:
             self.url_var.set(url)
-            self.url_entry.icursor(tk.END)
             self.preview()
         else:
             messagebox.showerror(
                 "Clipboard Error",
-                "Could not read clipboard.\n\n"
-                "Try clicking inside the URL box and pressing Ctrl+V,\n"
-                "or type/paste the URL manually."
+                "Could not read clipboard.\n\nTry Ctrl+V to paste manually."
             )
     
-    def build_ui(self):
-        main_frame = tk.Frame(self.frame, padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # URL Input Section with Paste button
-        tk.Label(main_frame, text="Video URL:", font=('Arial', 10, 'bold')).pack(anchor=tk.W)
-        
-        url_frame = tk.Frame(main_frame)
-        url_frame.pack(fill=tk.X, pady=(5, 10))
-        
-        self.url_var = tk.StringVar()
-        self.url_entry = tk.Entry(url_frame, textvariable=self.url_var, width=70, font=('Arial', 10))
-        self.url_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.create_context_menu(self.url_entry)
-
-        # Fix Ctrl+V for WSL and Linux:
-        # - In WSL, tkinter's default paste can't reach the Windows clipboard.
-        # - On native Linux, default paste uses PRIMARY (mouse highlight) not CLIPBOARD.
-        # We override it to use get_clipboard_text() which handles both cases.
-        def force_paste(event=None):
-            text = self.get_clipboard_text()
-            if text:
-                try:
-                    sel_start = self.url_entry.index(tk.SEL_FIRST)
-                    sel_end = self.url_entry.index(tk.SEL_LAST)
-                    self.url_entry.delete(sel_start, sel_end)
-                except tk.TclError:
-                    pass
-                self.url_entry.insert(tk.INSERT, text)
-            return "break"  # Suppress tkinter's default paste
-
-        self.url_entry.bind("<Control-v>", force_paste)
-        self.url_entry.bind("<Control-V>", force_paste)
-        
-        paste_btn = tk.Button(url_frame, text="📋 Paste", command=self.paste_from_clipboard, width=8, bg='#2196F3', fg='white')
-        paste_btn.pack(side=tk.RIGHT, padx=(5, 0))
-        
-        # Save Path
-        tk.Label(main_frame, text="Save Path:", font=('Arial', 10, 'bold')).pack(anchor=tk.W)
-        path_frame = tk.Frame(main_frame)
-        path_frame.pack(fill=tk.X, pady=(5, 10))
-        
-        self.path_var = tk.StringVar()
-        self.path_entry = tk.Entry(path_frame, textvariable=self.path_var, width=55, font=('Arial', 10))
-        self.path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.create_context_menu(self.path_entry)
-        
-        tk.Button(path_frame, text="Browse", command=self.browse, width=10).pack(side=tk.LEFT, padx=(5, 0))
-        
-        # Download Options
-        options_frame = tk.LabelFrame(main_frame, text="Download Options", padx=10, pady=10)
-        options_frame.pack(fill=tk.X, pady=10)
-        
-        self.audio_only = tk.BooleanVar()
-        tk.Checkbutton(options_frame, text="Audio Only (MP3)", variable=self.audio_only, font=('Arial', 10)).pack(anchor=tk.W)
-        
-        resolution_frame = tk.Frame(options_frame)
-        resolution_frame.pack(anchor=tk.W, pady=(5, 0))
-        tk.Label(resolution_frame, text="Resolution:", font=('Arial', 10)).pack(side=tk.LEFT)
-        self.res_var = tk.StringVar(value="720")
-        resolution_combo = ttk.Combobox(resolution_frame, values=RESOLUTIONS, textvariable=self.res_var, width=10, state='readonly')
-        resolution_combo.pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Preview Button
-        preview_frame = tk.Frame(main_frame)
-        preview_frame.pack(fill=tk.X, pady=10)
-        tk.Button(preview_frame, text="Preview Info", command=self.preview, width=15).pack(side=tk.LEFT)
-        self.info_label = tk.Label(preview_frame, text="", font=('Arial', 9, 'italic'), fg='gray')
-        self.info_label.pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Queue List Section
-        queue_label = tk.Label(main_frame, text="Download Queue:", font=('Arial', 10, 'bold'))
-        queue_label.pack(anchor=tk.W, pady=(10, 5))
-        
-        # Queue listbox with scrollbar
-        list_frame = tk.Frame(main_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
-        scrollbar = tk.Scrollbar(list_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.queue_listbox = tk.Listbox(list_frame, yscrollcommand=scrollbar.set, height=8)
-        self.queue_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.queue_listbox.yview)
-        
-        # Queue Control Buttons
-        queue_btn_frame = tk.Frame(main_frame)
-        queue_btn_frame.pack(fill=tk.X, pady=5)
-        
-        tk.Button(queue_btn_frame, text="Add to Queue", command=self.add_to_queue, width=12, bg='#2196F3', fg='white').pack(side=tk.LEFT, padx=2)
-        tk.Button(queue_btn_frame, text="Remove Selected", command=self.remove_selected, width=12, bg='#f44336', fg='white').pack(side=tk.LEFT, padx=2)
-        tk.Button(queue_btn_frame, text="Move Up", command=self.move_up, width=10).pack(side=tk.LEFT, padx=2)
-        tk.Button(queue_btn_frame, text="Move Down", command=self.move_down, width=10).pack(side=tk.LEFT, padx=2)
-        tk.Button(queue_btn_frame, text="Clear Queue", command=self.clear_queue, width=10).pack(side=tk.LEFT, padx=2)
-        
-        # Stats Frame
-        stats_frame = tk.Frame(main_frame)
-        stats_frame.pack(fill=tk.X, pady=5)
-        
-        self.stats_label = tk.Label(
-            stats_frame, 
-            text="📊 Total: 0 | ⏳ Pending: 0 | ▶️ Downloading: 0 | ✅ Completed: 0 | ❌ Failed: 0", 
-            font=('Arial', 9), 
-            fg='gray'
-        )
-        self.stats_label.pack(side=tk.LEFT)
-        
-        # Queue Action Buttons
-        action_frame = tk.Frame(main_frame)
-        action_frame.pack(fill=tk.X, pady=5)
-        
-        self.start_btn = tk.Button(action_frame, text="▶ Start Queue", command=self.start_queue, width=12, bg='#4CAF50', fg='white')
-        self.start_btn.pack(side=tk.LEFT, padx=2)
-        
-        self.stop_btn = tk.Button(action_frame, text="⏸ Stop Queue", command=self.stop_queue, width=12, bg='#f44336', fg='white', state='disabled')
-        self.stop_btn.pack(side=tk.LEFT, padx=2)
-        
-        # Progress Section
-        progress_frame = tk.LabelFrame(main_frame, text="Current Download", padx=10, pady=10)
-        progress_frame.pack(fill=tk.X, pady=10)
-        
-        self.current_title = tk.Label(progress_frame, text="No active download", font=('Arial', 9, 'italic'))
-        self.current_title.pack(anchor=tk.W, pady=(0, 5))
-        
-        self.percent_label = tk.Label(progress_frame, text="0%", font=('Arial', 10, 'bold'), fg='blue')
-        self.percent_label.pack(anchor=tk.W, pady=(0, 5))
-        
-        self.progress = ttk.Progressbar(progress_frame, length=400, mode='determinate')
-        self.progress.pack(fill=tk.X, pady=(0, 10))
-        
-        self.status_label = tk.Label(progress_frame, text="Ready", font=('Arial', 9))
-        self.status_label.pack(anchor=tk.W)
-        
-        self.speed_label = tk.Label(progress_frame, text="", font=('Arial', 9), fg='blue')
-        self.speed_label.pack(anchor=tk.W)
-        
-        self.eta_label = tk.Label(progress_frame, text="", font=('Arial', 9), fg='green')
-        self.eta_label.pack(anchor=tk.W)
-    
     def browse(self):
+        from tkinter import filedialog
         folder = filedialog.askdirectory()
         if folder:
             self.path_var.set(folder)
+            self.path_label.configure(text=folder, text_color=theme_manager.get_color("text_primary"))
+            if hasattr(self.app, 'update_storage'):
+                self.app.update_storage(folder)
     
     def preview(self):
         if not self.url_var.get():
@@ -250,16 +451,10 @@ class QueueTab:
             return
             
         try:
-            self.info_label.config(text="Fetching video info...", fg='orange')
-            self.frame.update()
-            
+            # Just validate - don't need to show info
             info = self.downloader.get_info(self.url_var.get())
-            duration = info.get('duration', 0)
-            duration_str = f"{duration // 60}:{duration % 60:02d}" if duration else "Unknown"
-            self.info_label.config(text=f"📹 {info['title']} ({duration_str})", fg='gray')
         except Exception as e:
-            self.info_label.config(text="Failed to fetch info", fg='red')
-            messagebox.showerror("Error", f"Failed to fetch video info:\n{str(e)}")
+            pass
     
     def add_to_queue(self):
         if not self.url_var.get():
@@ -270,30 +465,22 @@ class QueueTab:
             messagebox.showwarning("Warning", "Please select a save path")
             return
         
-        # Apply default settings from app settings
+        # Apply default settings
         default_res = self.app.settings.get("default_resolution", "720")
         default_audio = self.app.settings.get("default_audio_only", False)
         
-        # If user hasn't changed resolution from default (720), use saved default
         if self.res_var.get() == "720" and default_res != "720":
             self.res_var.set(default_res)
         
-        # If audio only not set by user, use saved default
         if not self.audio_only.get() and default_audio:
             self.audio_only.set(True)
         
-        # Get video info with better error handling
+        # Get video title
         try:
-            self.info_label.config(text="Fetching video info...", fg='orange')
-            self.frame.update()
             info = self.downloader.get_info(self.url_var.get())
             title = info.get('title', 'Unknown')
-            duration = info.get('duration', 0)
-            duration_str = f"{duration // 60}:{duration % 60:02d}" if duration else "Unknown"
-            self.info_label.config(text=f"📹 {title} ({duration_str})", fg='gray')
         except Exception as e:
             title = self.url_var.get()[:50]
-            self.info_label.config(text="Could not fetch title, using URL", fg='orange')
         
         # Create queue item
         queue_item = {
@@ -306,62 +493,201 @@ class QueueTab:
             "date_added": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        # Add to queue
         self.queue.append(queue_item)
         save_queue(self.queue)
         self.refresh_queue_display()
         
-        # Clear URL and reset to defaults for next input
+        # Clear URL
         self.url_var.set("")
         
-        # Reset to saved defaults for next addition
+        # Reset to defaults
         self.res_var.set(self.app.settings.get("default_resolution", "720"))
         self.audio_only.set(self.app.settings.get("default_audio_only", False))
         
-        # Show success message
-        messagebox.showinfo("Success", f"Added to queue: {title}\n\nQueue position: {len(self.queue)}")
-        
         self.update_stats_display()
     
-    def remove_selected(self):
-        selection = self.queue_listbox.curselection()
-        if selection:
-            index = selection[0]
-            if index < len(self.queue):
-                del self.queue[index]
-                save_queue(self.queue)
-                self.refresh_queue_display()
-                self.update_stats_display()
+    def refresh_queue_display(self):
+        """Refresh queue display with card rows"""
+        # Clear existing widgets
+        for widget in self.queue_container.winfo_children():
+            widget.destroy()
+        
+        for i, item in enumerate(self.queue):
+            status = item.get("status", "pending")
+            
+            # Row card
+            row = ctk.CTkFrame(
+                self.queue_container,
+                fg_color=theme_manager.get_color("card") if status != "pending" else "#0A1A16",
+                border_width=1,
+                border_color=theme_manager.get_color("border"),
+                corner_radius=8
+            )
+            row.pack(fill="x", pady=4)
+            
+            # Thumbnail placeholder
+            thumb = ctk.CTkFrame(
+                row,
+                width=40,
+                height=28,
+                fg_color=theme_manager.get_color("surface"),
+                corner_radius=4
+            )
+            thumb.pack(side="left", padx=12, pady=10)
+            thumb.pack_propagate(False)
+            
+            _thumb_icon = icon_manager.get("download_sm") if not item.get("audio_only") else icon_manager.get("music_sm")
+            icon_label = ctk.CTkLabel(
+                thumb,
+                text="",
+                image=_thumb_icon,
+            )
+            icon_label.pack(expand=True)
+            
+            # Middle section - title and chips
+            middle = ctk.CTkFrame(row, fg_color="transparent")
+            middle.pack(side="left", fill="x", expand=True, padx=(0, 12), pady=10)
+            
+            # Title
+            title_color = theme_manager.get_color("greige") if status == "completed" else theme_manager.get_color("text_primary")
+            title_label = ctk.CTkLabel(
+                middle,
+                text=item.get('title', 'Unknown')[:60],
+                font=ctk.CTkFont(size=13, weight="bold" if status != "completed" else "normal"),
+                text_color=title_color,
+                anchor="w"
+            )
+            title_label.pack(anchor="w")
+            
+            # Chips row
+            chips_row = ctk.CTkFrame(middle, fg_color="transparent")
+            chips_row.pack(anchor="w", pady=(4, 0))
+            
+            # Resolution/Format chip
+            res_text = f"{item.get('resolution', 'N/A')}p"
+            if item.get('audio_only'):
+                res_text = "MP3"
+            
+            res_chip = ctk.CTkFrame(
+                chips_row,
+                fg_color=theme_manager.get_color("surface"),
+                border_width=1,
+                border_color=theme_manager.get_color("mid"),
+                corner_radius=4
+            )
+            res_chip.pack(side="left", padx=(0, 6))
+            
+            res_label = ctk.CTkLabel(
+                res_chip,
+                text=res_text,
+                font=ctk.CTkFont(size=10),
+                text_color=theme_manager.get_color("accent")
+            )
+            res_label.pack(padx=6, pady=2)
+            
+            # Status dot
+            if status == "pending":
+                dot_color = theme_manager.get_color("mid")
+                dot_text = "Pending"
+            elif status == "downloading":
+                dot_color = theme_manager.get_color("warning")
+                dot_text = "Downloading"
+            elif status == "completed":
+                dot_color = theme_manager.get_color("success")
+                dot_text = "Completed"
+            elif status == "failed":
+                dot_color = theme_manager.get_color("error")
+                dot_text = "Failed"
+            else:
+                dot_color = theme_manager.get_color("mid")
+                dot_text = "Pending"
+            
+            status_chip = ctk.CTkFrame(
+                chips_row,
+                fg_color=theme_manager.get_color("surface"),
+                border_width=1,
+                border_color=dot_color,
+                corner_radius=4
+            )
+            status_chip.pack(side="left")
+            
+            status_label = ctk.CTkLabel(
+                status_chip,
+                text=f"● {dot_text}",
+                font=ctk.CTkFont(size=10),
+                text_color=dot_color
+            )
+            status_label.pack(padx=6, pady=2)
+            
+            # Right side - action buttons
+            actions = ctk.CTkFrame(row, fg_color="transparent")
+            actions.pack(side="right", padx=12, pady=10)
+            
+            folder_btn = ctk.CTkButton(
+                actions,
+                text="",
+                image=icon_manager.get("folder_sm"),
+                width=28,
+                height=28,
+                fg_color="transparent",
+                border_width=1,
+                border_color=theme_manager.get_color("border"),
+                text_color=theme_manager.get_color("muted"),
+                hover_color=theme_manager.get_color("surface"),
+                corner_radius=6,
+                command=lambda p=item.get('path', ''): self.open_folder(p)
+            )
+            folder_btn.pack(side="left", padx=2)
+            
+            if status != "downloading":
+                delete_btn = ctk.CTkButton(
+                    actions,
+                    text="",
+                    image=icon_manager.get("trash_sm"),
+                    width=28,
+                    height=28,
+                    fg_color="transparent",
+                    border_width=1,
+                    border_color=theme_manager.get_color("error"),
+                    text_color=theme_manager.get_color("error"),
+                    hover_color=theme_manager.get_color("surface"),
+                    corner_radius=6,
+                    command=lambda idx=i: self.remove_item(idx)
+                )
+                delete_btn.pack(side="left", padx=2)
+        
+        self.update_stats_display()
+        
+        # Update app badge
+        if hasattr(self.app, 'update_count_badge'):
+            pending_count = sum(1 for item in self.queue if item.get("status") == "pending")
+            self.app.update_count_badge(pending_count)
     
-    def move_up(self):
-        selection = self.queue_listbox.curselection()
-        if selection and selection[0] > 0:
-            index = selection[0]
-            self.queue[index], self.queue[index-1] = self.queue[index-1], self.queue[index]
+    def remove_item(self, index):
+        """Remove item at index"""
+        if index < len(self.queue):
+            del self.queue[index]
             save_queue(self.queue)
             self.refresh_queue_display()
-            self.queue_listbox.selection_set(index-1)
-            self.update_stats_display()
     
-    def move_down(self):
-        selection = self.queue_listbox.curselection()
-        if selection and selection[0] < len(self.queue) - 1:
-            index = selection[0]
-            self.queue[index], self.queue[index+1] = self.queue[index+1], self.queue[index]
-            save_queue(self.queue)
-            self.refresh_queue_display()
-            self.queue_listbox.selection_set(index+1)
-            self.update_stats_display()
+    def open_folder(self, path):
+        """Open folder in file explorer"""
+        if path and os.path.exists(path):
+            import sys
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
     
-    def clear_queue(self):
-        if messagebox.askyesno("Clear Queue", "Are you sure you want to clear the entire queue?"):
-            self.queue = []
-            save_queue(self.queue)
-            self.refresh_queue_display()
-            self.update_stats_display()
+    def clear_completed(self):
+        """Remove all completed items from queue"""
+        self.queue = [item for item in self.queue if item.get("status") != "completed"]
+        save_queue(self.queue)
+        self.refresh_queue_display()
     
     def get_queue_stats(self):
-        """Get queue statistics"""
         total = len(self.queue)
         pending = sum(1 for item in self.queue if item.get("status") == "pending")
         downloading = sum(1 for item in self.queue if item.get("status") == "downloading")
@@ -377,144 +703,85 @@ class QueueTab:
         }
     
     def update_stats_display(self):
-        """Update the statistics display"""
         stats = self.get_queue_stats()
-        self.stats_label.config(
-            text=f"📊 Total: {stats['total']} | ⏳ Pending: {stats['pending']} | "
-                 f"▶️ Downloading: {stats['downloading']} | ✅ Completed: {stats['completed']} | ❌ Failed: {stats['failed']}"
-        )
-    
-    def refresh_queue_display(self):
-        """Update the queue listbox display with better formatting"""
-        self.queue_listbox.delete(0, tk.END)
-        for i, item in enumerate(self.queue, 1):
-            status = item.get("status", "pending")
-            if status == "pending":
-                status_icon = "⏳"
-            elif status == "downloading":
-                status_icon = "▶️"
-            elif status == "completed":
-                status_icon = "✅"
-            elif status == "failed":
-                status_icon = "❌"
-            else:
-                status_icon = "❓"
-            
-            # Truncate long titles
-            title = item.get('title', 'Unknown')
-            if len(title) > 50:
-                title = title[:47] + "..."
-            
-            display_text = f"{i:2}. {status_icon} {title} - {item.get('resolution', 'N/A')}"
-            if item.get('audio_only'):
-                display_text += " (Audio)"
-            
-            self.queue_listbox.insert(tk.END, display_text)
-            
-            # Color code based on status
-            if status == "completed":
-                self.queue_listbox.itemconfig(i-1, fg='green')
-            elif status == "failed":
-                self.queue_listbox.itemconfig(i-1, fg='red')
-            elif status == "downloading":
-                self.queue_listbox.itemconfig(i-1, fg='blue')
-        
-        self.update_stats_display()
+        self.stat_chips["Total"].configure(text=f"Total: {stats['total']}")
+        self.stat_chips["Pending"].configure(text=f"Pending: {stats['pending']}")
+        self.stat_chips["Active"].configure(text=f"Active: {stats['downloading']}")
+        self.stat_chips["Done"].configure(text=f"Done: {stats['completed']}")
     
     def start_queue(self):
-        """Start processing the queue"""
         if self.downloading:
             return
         
-        # Check if there are pending items
         pending = any(item.get("status") == "pending" for item in self.queue)
         if not pending:
             messagebox.showinfo("Queue Empty", "No pending downloads in queue")
             return
         
         self.downloading = True
-        self.start_btn.config(state='disabled')
-        self.stop_btn.config(state='normal')
-        self.status_label.config(text="Queue processing started...")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
         
-        # Start queue processor in a separate thread
+        self.active_card.pack(fill="x", pady=(0, 16))
+        
         thread = threading.Thread(target=self.process_queue, daemon=True)
         thread.start()
     
     def stop_queue(self):
-        """Stop processing the queue"""
         self.downloading = False
-        self.start_btn.config(state='normal')
-        self.stop_btn.config(state='disabled')
-        self.status_label.config(text="Queue stopped by user")
+        if self.current_download_item:
+            self.downloader.cancel()
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
         self.update_stats_display()
     
     def process_queue(self):
-        """Process items in the queue one by one"""
         for i, item in enumerate(self.queue):
             if not self.downloading:
                 break
             
             if item.get("status") == "pending":
-                # Update status to downloading
                 item["status"] = "downloading"
                 save_queue(self.queue)
                 
-                # Update UI
-                self.frame.after(0, lambda: self.refresh_queue_display())
-                self.frame.after(0, lambda t=item['title']: self.current_title.config(text=f"Downloading: {t}"))
+                self.frame.after(0, lambda t=item['title']: self.active_title_label.configure(text=t[:60]))
+                self.frame.after(0, self.refresh_queue_display)
                 
-                # Download the item
                 self.download_item(item)
                 
-                # Wait for download to complete (status will be updated by download_item)
                 while item.get("status") == "downloading" and self.downloading:
                     import time
                     time.sleep(0.5)
                     self.frame.after(0, self.update_stats_display)
         
         self.downloading = False
-        self.frame.after(0, lambda: self.start_btn.config(state='normal'))
-        self.frame.after(0, lambda: self.stop_btn.config(state='disabled'))
-        self.frame.after(0, lambda: self.status_label.config(text="Queue processing completed!"))
-        self.frame.after(0, lambda: self.current_title.config(text="No active download"))
+        self.frame.after(0, lambda: self.start_btn.configure(state="normal"))
+        self.frame.after(0, lambda: self.stop_btn.configure(state="disabled"))
+        self.frame.after(0, lambda: self.active_card.pack_forget())
         self.frame.after(0, self.update_stats_display)
+        self.frame.after(0, self.refresh_queue_display)
     
     def download_item(self, item):
-        """Download a single queue item"""
         download_complete = threading.Event()
+        self.current_download_item = item
         
         def update_progress(data):
             def update():
                 if '_percent' in data:
-                    percent = data['_percent']
-                    self.progress['value'] = percent
-                    self.percent_label.config(text=f"{percent:.1f}%")
-                elif '_percent_str' in data:
-                    percent_str = data['_percent_str'].strip('%')
-                    try:
-                        percent = float(percent_str)
-                        self.progress['value'] = percent
-                        self.percent_label.config(text=f"{percent:.1f}%")
-                    except ValueError:
-                        pass
+                    percent = data['_percent'] / 100
+                    self.progress_bar.set(percent)
+                    self.percent_label.configure(text=f"{data['_percent']:.1f}%")
                 
                 if '_speed_str' in data and data['_speed_str']:
-                    self.speed_label.config(text=f"⚡ {data['_speed_str']}")
-                else:
-                    self.speed_label.config(text="")
+                    self.speed_label.configure(text=f"{data['_speed_str']}")
                 
                 if '_eta_str' in data and data['_eta_str']:
-                    self.eta_label.config(text=f"⏱ {data['_eta_str']}")
-                else:
-                    self.eta_label.config(text="")
+                    self.eta_label.configure(text=f"ETA: {data['_eta_str']}")
                 
                 if '_downloaded_bytes_str' in data and '_total_bytes_str' in data:
-                    self.status_label.config(text=f"Downloading: {data['_downloaded_bytes_str']} / {data['_total_bytes_str']}")
+                    self.bytes_label.configure(text=f"{data['_downloaded_bytes_str']} / {data['_total_bytes_str']}")
                 elif '_percent_str' in data:
-                    self.status_label.config(text=f"Downloading: {data['_percent_str']}")
-                elif data.get('status') == 'finished':
-                    self.status_label.config(text="Processing download...")
+                    self.bytes_label.configure(text=f"{data['_percent_str']}")
             
             self.frame.after(0, update)
         
@@ -522,32 +789,28 @@ class QueueTab:
             def finalize():
                 if "completed" in msg.lower():
                     item["status"] = "completed"
-                    self.status_label.config(text="✅ Download completed!")
                     save_history({
                         "url": item["url"],
                         "resolution": item["resolution"] if not item["audio_only"] else "Audio Only",
                         "status": msg
                     })
-                    # Notify app to refresh library tabs
                     self.app.on_download_complete()
                 else:
                     item["status"] = "failed"
-                    self.status_label.config(text=f"❌ {msg}")
                 
                 save_queue(self.queue)
                 self.refresh_queue_display()
                 
-                # Reset progress display
-                self.progress['value'] = 0
-                self.percent_label.config(text="0%")
-                self.speed_label.config(text="")
-                self.eta_label.config(text="")
+                self.progress_bar.set(0)
+                self.percent_label.configure(text="0%")
+                self.speed_label.configure(text="")
+                self.eta_label.configure(text="")
+                self.bytes_label.configure(text="0 MB / 0 MB")
                 
                 download_complete.set()
             
             self.frame.after(0, finalize)
         
-        # Create a downloader instance for this item
         downloader = Downloader()
         downloader.download(
             item["url"],
@@ -558,43 +821,15 @@ class QueueTab:
             audio_only=item["audio_only"]
         )
         
-        # Wait for download to complete or be cancelled
         download_complete.wait()
+        self.current_download_item = None
     
     def show(self):
-        self.frame.pack(fill=tk.BOTH, expand=True)
+        self.frame.pack(fill="both", expand=True)
         self.refresh_queue_display()
         self.update_stats_display()
-        # Focus the URL entry for quick pasting
         if hasattr(self, 'url_entry'):
             self.url_entry.focus_set()
     
     def hide(self):
         self.frame.pack_forget()
-    
-    def apply_theme(self, theme):
-        self.frame.configure(bg=theme["bg"])
-        for widget in self.frame.winfo_children():
-            self.apply_theme_to_widget(widget, theme)
-    
-    def apply_theme_to_widget(self, widget, theme):
-        try:
-            if isinstance(widget, (tk.Frame, tk.LabelFrame, tk.Label)):
-                widget.configure(bg=theme["bg"])
-                if isinstance(widget, tk.Label):
-                    current_fg = widget.cget("fg")
-                    if current_fg not in ["orange", "red", "gray", "#ffa500", "#ff0000", "#808080", "blue", "green"]:
-                        widget.configure(fg=theme["fg"])
-            elif isinstance(widget, tk.Button):
-                current_bg = widget.cget("bg")
-                if current_bg not in ["#2196F3", "#4CAF50", "#f44336", "#4caf50", "#388e3c"]:
-                    widget.configure(bg=theme["button_bg"], fg=theme["button_fg"])
-            elif isinstance(widget, tk.Entry):
-                widget.configure(bg=theme["entry_bg"], fg=theme["entry_fg"])
-            elif isinstance(widget, ttk.Combobox):
-                pass
-        except:
-            pass
-        
-        for child in widget.winfo_children():
-            self.apply_theme_to_widget(child, theme)
