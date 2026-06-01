@@ -1,5 +1,5 @@
 {
-    "theme": "dark",
+    "theme": "light",
     "parallel_limit": 2,
     "download_mode": "parallel",
     "auto_clipboard": true,

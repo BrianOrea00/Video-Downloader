@@ -17,6 +17,7 @@ class MusicTab:
         self.app = app
         self.frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.current_files = []
+        self.empty_state = None  # Initialize as None
         
         self.build_ui()
     
@@ -99,7 +100,20 @@ class MusicTab:
         )
         self.list_container.pack(fill="both", expand=True)
         
-        # Empty state
+        # Create empty state (but don't pack it yet)
+        self.create_empty_state()
+        
+        # Status bar
+        self.status_bar = ctk.CTkLabel(
+            self.frame,
+            text="Ready",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("secondary")
+        )
+        self.status_bar.pack(fill="x", pady=(12, 0))
+    
+    def create_empty_state(self):
+        """Create the empty state widget"""
         self.empty_state = ctk.CTkFrame(self.list_container, fg_color="transparent")
         
         empty_icon = ctk.CTkLabel(
@@ -125,15 +139,6 @@ class MusicTab:
             text_color=theme_manager.get_color("muted")
         )
         empty_sub.pack()
-        
-        # Status bar
-        self.status_bar = ctk.CTkLabel(
-            self.frame,
-            text="Ready",
-            font=ctk.CTkFont(size=11),
-            text_color=theme_manager.get_color("secondary")
-        )
-        self.status_bar.pack(fill="x", pady=(12, 0))
     
     def get_download_path(self):
         if hasattr(self.app, 'queue_tab'):
@@ -170,16 +175,80 @@ class MusicTab:
                     artist = audio.get('artist')[0]
                 duration = audio.info.length
             else:
-                duration = 0
+                # For other formats like .ogg, .wav, try to get duration using mutagen
+                try:
+                    from mutagen import File
+                    audio = File(filepath)
+                    if audio and hasattr(audio.info, 'length'):
+                        duration = audio.info.length
+                    else:
+                        duration = 0
+                except:
+                    duration = 0
             
-            if duration > 0:
+            # Format duration properly (handle None or 0)
+            if duration and duration > 0:
                 minutes = int(duration // 60)
                 seconds = int(duration % 60)
                 duration_str = f"{minutes}:{seconds:02d}"
-        except Exception:
-            pass
+            else:
+                # Try alternative method using ffprobe if mutagen fails
+                duration_str = self.get_duration_ffprobe(filepath)
+                if duration_str == "0:00":
+                    # Try to get from filename if it contains duration pattern
+                    duration_str = self.extract_duration_from_filename(filename)
+                    
+        except Exception as e:
+            print(f"Error reading metadata for {filename}: {e}")
+            # Fallback: try to get duration using ffprobe
+            duration_str = self.get_duration_ffprobe(filepath)
+            if duration_str == "0:00":
+                duration_str = self.extract_duration_from_filename(filename)
         
         return title, artist, duration_str
+
+    def get_duration_ffprobe(self, filepath):
+        """Use ffprobe to get duration as fallback"""
+        try:
+            import subprocess
+            import json
+            
+            cmd = [
+                'ffprobe', '-v', 'quiet', '-print_format', 'json',
+                '-show_streams', filepath
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                for stream in data.get('streams', []):
+                    if stream.get('codec_type') == 'audio':
+                        duration = float(stream.get('duration', 0))
+                        if duration > 0:
+                            minutes = int(duration // 60)
+                            seconds = int(duration % 60)
+                            return f"{minutes}:{seconds:02d}"
+        except Exception as e:
+            print(f"ffprobe failed: {e}")
+        return "0:00"
+
+    def extract_duration_from_filename(self, filename):
+        """Try to extract duration from filename pattern like [03:45] or (3:45)"""
+        import re
+        # Pattern for [MM:SS] or (MM:SS) or MM:SS
+        patterns = [
+            r'\[(\d+):(\d+)\]',
+            r'\((\d+):(\d+)\)',
+            r'(\d+):(\d+)(?:\s|$)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, filename)
+            if match:
+                minutes = int(match.group(1))
+                seconds = int(match.group(2))
+                if seconds < 60:
+                    return f"{minutes}:{seconds:02d}"
+        return "0:00"
     
     def format_size(self, size_bytes):
         for unit in ['B', 'KB', 'MB', 'GB']:
@@ -192,14 +261,19 @@ class MusicTab:
         download_path = self.get_download_path()
         
         if not download_path:
-            self.path_label.configure(text="No download folder selected")
-            self.status_bar.configure(text="Please select a download folder in Queue tab")
+            try:
+                self.path_label.configure(text="No download folder selected")
+                self.status_bar.configure(text="Please select a download folder in Queue tab")
+            except:
+                pass
             self.show_empty_state()
             return
         
-        self.path_label.configure(text=download_path, text_color=theme_manager.get_color("text_primary"))
-        self.status_bar.configure(text="Scanning for music...")
-        self.frame.update()
+        try:
+            self.path_label.configure(text=download_path, text_color=theme_manager.get_color("text_primary"))
+            self.status_bar.configure(text="Scanning for music...")
+        except:
+            pass
         
         audio_extensions = ('.mp3', '.m4a', '.ogg', '.flac', '.wav')
         
@@ -227,27 +301,59 @@ class MusicTab:
                         })
             
             self.current_files.sort(key=lambda x: x['title'].lower())
-            self.filter_files()
-            self.status_bar.configure(text=f"Found {len(self.current_files)} music files")
+            
+            # Schedule UI update
+            self.frame.after(100, self.filter_files)
+            
+            try:
+                self.status_bar.configure(text=f"Found {len(self.current_files)} music files")
+            except:
+                pass
             
         except Exception as e:
-            self.status_bar.configure(text=f"Error scanning: {str(e)}")
+            try:
+                self.status_bar.configure(text=f"Error scanning: {str(e)[:50]}")
+            except:
+                pass
             self.show_empty_state()
     
     def show_empty_state(self):
-        for widget in self.list_container.winfo_children():
-            widget.destroy()
-        self.empty_state.pack(fill="both", expand=True)
+        """Safely show empty state"""
+        try:
+            # Clear container first
+            for widget in self.list_container.winfo_children():
+                try:
+                    widget.destroy()
+                except:
+                    pass
+            
+            # Recreate empty state
+            self.create_empty_state()
+            self.empty_state.pack(fill="both", expand=True)
+        except Exception as e:
+            print(f"Error showing empty state: {e}")
     
     def hide_empty_state(self):
-        self.empty_state.pack_forget()
+        """Safely hide empty state"""
+        try:
+            if self.empty_state and self.empty_state.winfo_exists():
+                self.empty_state.pack_forget()
+        except:
+            pass
     
     def filter_files(self):
         search_term = self.search_var.get().lower()
         
-        for widget in self.list_container.winfo_children():
-            if widget != self.empty_state:
-                widget.destroy()
+        # Safely clear the container
+        try:
+            for widget in self.list_container.winfo_children():
+                try:
+                    if widget != self.empty_state:
+                        widget.destroy()
+                except:
+                    pass
+        except:
+            pass
         
         filtered = [f for f in self.current_files if search_term in f['title'].lower() or search_term in f['artist'].lower()]
         
@@ -258,7 +364,10 @@ class MusicTab:
         self.hide_empty_state()
         
         for file_info in filtered:
-            self.create_file_row(file_info)
+            try:
+                self.create_file_row(file_info)
+            except Exception as e:
+                print(f"Error creating row: {e}")
     
     def create_file_row(self, file_info):
         row = ctk.CTkFrame(
@@ -410,8 +519,7 @@ class MusicTab:
         if messagebox.askyesno("Confirm Delete", f"Delete '{title}'?\n\nThis action cannot be undone!"):
             try:
                 os.remove(filepath)
-                self.status_bar.configure(text=f"Deleted: {title}")
-                self.refresh_files()
+                self.frame.after(500, self.refresh_files)
             except Exception as e:
                 messagebox.showerror("Delete Error", f"Failed to delete file:\n{str(e)}")
     
