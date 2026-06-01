@@ -12,7 +12,10 @@ DEFAULT_SETTINGS = {
     "clipboard_interval": 3000,
     "default_resolution": "720",
     "default_audio_only": False,
-    "download_path": ""
+    "download_path": "",
+    "cookie_method": "none",  # Options: "none", "browser", "file"
+    "cookie_browser": "chrome",  # Options: "chrome", "firefox", "edge", "brave", "opera", "safari"
+    "cookie_file_path": ""  # Path to cookies.txt file
 }
 
 # These are now just for reference - CustomTkinter custom theme handles colors

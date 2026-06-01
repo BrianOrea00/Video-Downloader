@@ -760,10 +760,17 @@ class QueueTab:
         self.frame.after(0, lambda: self.active_card.pack_forget())
         self.frame.after(0, self.update_stats_display)
         self.frame.after(0, self.refresh_queue_display)
-    
+        
     def download_item(self, item):
         download_complete = threading.Event()
         self.current_download_item = item
+        
+        # Build cookie settings from app settings
+        cookie_settings = {
+            "cookie_method": self.app.settings.get("cookie_method", "none"),
+            "cookie_browser": self.app.settings.get("cookie_browser", "chrome"),
+            "cookie_file_path": self.app.settings.get("cookie_file_path", "")
+        }
         
         def update_progress(data):
             def update():
@@ -818,7 +825,8 @@ class QueueTab:
             item["resolution"],
             update_progress,
             done_callback,
-            audio_only=item["audio_only"]
+            audio_only=item["audio_only"],
+            cookie_settings=cookie_settings  # Pass cookie settings here
         )
         
         download_complete.wait()

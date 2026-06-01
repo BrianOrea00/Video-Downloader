@@ -1,9 +1,10 @@
 import customtkinter as ctk
-from tkinter import messagebox
-from config import RESOLUTIONS
+from tkinter import messagebox, filedialog
+from config import RESOLUTIONS, DEFAULT_SETTINGS
 from utils import save_settings
 from icon_manager import icon_manager
 from theme_manager import theme_manager
+from downloader import Downloader
 
 
 class SettingsTab:
@@ -28,6 +29,7 @@ class SettingsTab:
         # Settings sections
         self.build_section_download()
         self.build_section_defaults()
+        self.build_section_cookies()  # NEW
         self.build_section_general()
         self.build_section_appearance()
         self.build_section_path()
@@ -211,6 +213,166 @@ class SettingsTab:
         )
         self.create_row(content, "Audio Only (MP3) by default:", audio_switch)
     
+    def build_section_cookies(self):
+        """NEW: Cookies section for handling login-required and Cloudflare-protected sites"""
+        content = self.create_section_card(self.main_frame, "Cookies (For Login/Protected Sites)")
+        
+        # Cookie method selection
+        method_frame = ctk.CTkFrame(content, fg_color="transparent")
+        method_frame.pack(fill="x", pady=8)
+        
+        method_label = ctk.CTkLabel(
+            method_frame,
+            text="Cookie Source:",
+            width=180,
+            anchor="w",
+            font=ctk.CTkFont(size=13),
+            text_color=theme_manager.get_color("greige")
+        )
+        method_label.pack(side="left")
+        
+        method_radio_frame = ctk.CTkFrame(method_frame, fg_color="transparent")
+        method_radio_frame.pack(side="right")
+        
+        self.cookie_method_var = ctk.StringVar(value="none")
+        
+        none_radio = ctk.CTkRadioButton(
+            method_radio_frame,
+            text="None",
+            variable=self.cookie_method_var,
+            value="none",
+            command=self.on_cookie_method_change
+        )
+        none_radio.pack(side="left", padx=(0, 12))
+        
+        browser_radio = ctk.CTkRadioButton(
+            method_radio_frame,
+            text="Browser",
+            variable=self.cookie_method_var,
+            value="browser",
+            command=self.on_cookie_method_change
+        )
+        browser_radio.pack(side="left", padx=(0, 12))
+        
+        file_radio = ctk.CTkRadioButton(
+            method_radio_frame,
+            text="Cookies.txt File",
+            variable=self.cookie_method_var,
+            value="file",
+            command=self.on_cookie_method_change
+        )
+        file_radio.pack(side="left")
+        
+        # Browser selection (enabled when "browser" is selected)
+        self.browser_frame = ctk.CTkFrame(content, fg_color="transparent")
+        self.browser_frame.pack(fill="x", pady=8)
+        
+        browser_label = ctk.CTkLabel(
+            self.browser_frame,
+            text="Browser:",
+            width=180,
+            anchor="w",
+            font=ctk.CTkFont(size=13),
+            text_color=theme_manager.get_color("greige")
+        )
+        browser_label.pack(side="left")
+        
+        self.cookie_browser_var = ctk.StringVar(value="chrome")
+        browser_combo = ctk.CTkComboBox(
+            self.browser_frame,
+            values=["chrome", "firefox", "edge", "brave", "opera", "safari"],
+            variable=self.cookie_browser_var,
+            width=120,
+            height=32,
+            fg_color=theme_manager.get_color("surface"),
+            border_color=theme_manager.get_color("border"),
+            button_color=theme_manager.get_color("accent"),
+            text_color=theme_manager.get_color("text_primary")
+        )
+        browser_combo.pack(side="right")
+        
+        # Cookie file path selection (enabled when "file" is selected)
+        self.cookie_file_frame = ctk.CTkFrame(content, fg_color="transparent")
+        self.cookie_file_frame.pack(fill="x", pady=8)
+        
+        file_label = ctk.CTkLabel(
+            self.cookie_file_frame,
+            text="Cookies.txt Path:",
+            width=180,
+            anchor="w",
+            font=ctk.CTkFont(size=13),
+            text_color=theme_manager.get_color("greige")
+        )
+        file_label.pack(side="left")
+        
+        file_controls = ctk.CTkFrame(self.cookie_file_frame, fg_color="transparent")
+        file_controls.pack(side="right")
+        
+        self.cookie_file_path_var = ctk.StringVar()
+        cookie_file_entry = ctk.CTkEntry(
+            file_controls,
+            textvariable=self.cookie_file_path_var,
+            width=250,
+            height=32,
+            fg_color=theme_manager.get_color("surface"),
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("text_primary"),
+            placeholder_text="/path/to/cookies.txt"
+        )
+        cookie_file_entry.pack(side="left", padx=(0, 8))
+        
+        browse_cookie_btn = ctk.CTkButton(
+            file_controls,
+            text="Browse",
+            width=80,
+            height=32,
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("muted"),
+            hover_color=theme_manager.get_color("card"),
+            corner_radius=6,
+            command=self.browse_cookie_file
+        )
+        browse_cookie_btn.pack(side="left")
+        
+        # Test button row
+        test_frame = ctk.CTkFrame(content, fg_color="transparent")
+        test_frame.pack(fill="x", pady=(12, 8))
+        
+        self.test_cookies_btn = ctk.CTkButton(
+            test_frame,
+            text="Test Cookies",
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("accent"),
+            text_color=theme_manager.get_color("accent"),
+            height=32,
+            width=120,
+            corner_radius=6,
+            command=self.test_cookies
+        )
+        self.test_cookies_btn.pack(side="left")
+        
+        # Test status label
+        self.cookie_test_status = ctk.CTkLabel(
+            test_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color=theme_manager.get_color("greige")
+        )
+        self.cookie_test_status.pack(side="left", padx=(12, 0))
+        
+        # Info hint
+        info_hint = ctk.CTkLabel(
+            content,
+            text="ℹ️ Cookies help access login-required content and bypass Cloudflare protection",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("muted"),
+            anchor="w"
+        )
+        info_hint.pack(fill="x", pady=(8, 0))
+    
     def build_section_general(self):
         content = self.create_section_card(self.main_frame, "General Settings")
         
@@ -389,10 +551,33 @@ class SettingsTab:
         self.status_label.pack(pady=(12, 0))
     
     def browse_path(self):
-        from tkinter import filedialog
         folder = filedialog.askdirectory()
         if folder:
             self.download_path_var.set(folder)
+    
+    def browse_cookie_file(self):
+        """Browse for cookies.txt file"""
+        file_path = filedialog.askopenfilename(
+            title="Select cookies.txt file",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        if file_path:
+            self.cookie_file_path_var.set(file_path)
+    
+    def on_cookie_method_change(self):
+        """Handle cookie method selection changes"""
+        method = self.cookie_method_var.get()
+        
+        # Hide/show browser selection
+        if method == "browser":
+            self.browser_frame.pack(fill="x", pady=8)
+            self.cookie_file_frame.pack_forget()
+        elif method == "file":
+            self.browser_frame.pack_forget()
+            self.cookie_file_frame.pack(fill="x", pady=8)
+        else:  # none
+            self.browser_frame.pack_forget()
+            self.cookie_file_frame.pack_forget()
     
     def on_mode_change(self):
         if self.download_mode_var.get() == "sequential":
@@ -403,6 +588,60 @@ class SettingsTab:
     def on_clipboard_toggle(self):
         # Handled by switch state
         pass
+    
+    def test_cookies(self):
+        """Test the current cookie configuration with a test URL"""
+        method = self.cookie_method_var.get()
+        
+        if method == "none":
+            messagebox.showinfo("Info", "No cookie method selected. Enable cookies in settings to test.")
+            return
+        
+        # Use a test URL that commonly requires authentication or has restrictions
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        
+        self.cookie_test_status.configure(text="Testing...", text_color=theme_manager.get_color("warning"))
+        self.test_cookies_btn.configure(state="disabled")
+        self.frame.update()
+        
+        # Build cookie settings dict
+        cookie_settings = {
+            "cookie_method": method,
+            "cookie_browser": self.cookie_browser_var.get() if method == "browser" else "",
+            "cookie_file_path": self.cookie_file_path_var.get() if method == "file" else ""
+        }
+        
+        def run_test():
+            try:
+                downloader = Downloader()
+                info = downloader.get_info(test_url, cookie_settings)
+                
+                # Success - got info
+                title = info.get('title', 'Unknown')
+                self.frame.after(0, lambda: self.cookie_test_status.configure(
+                    text=f"✓ Success! Cookies working. Retrieved: {title[:50]}...",
+                    text_color=theme_manager.get_color("success")
+                ))
+                self.frame.after(0, lambda: messagebox.showinfo(
+                    "Cookie Test Passed",
+                    f"Successfully retrieved video info with cookies!\n\nTitle: {title[:100]}"
+                ))
+            except Exception as e:
+                error_msg = str(e)
+                self.frame.after(0, lambda: self.cookie_test_status.configure(
+                    text=f"✗ Failed: {error_msg[:80]}",
+                    text_color=theme_manager.get_color("error")
+                ))
+                self.frame.after(0, lambda: messagebox.showerror(
+                    "Cookie Test Failed",
+                    f"Could not retrieve video info with current cookie settings.\n\nError: {error_msg}\n\nMake sure:\n- You are logged into the site in your browser (if using browser method)\n- Your cookies.txt file is valid (if using file method)"
+                ))
+            finally:
+                self.frame.after(0, lambda: self.test_cookies_btn.configure(state="normal"))
+        
+        import threading
+        thread = threading.Thread(target=run_test, daemon=True)
+        thread.start()
     
     def load_settings(self):
         settings = self.app.settings
@@ -423,6 +662,14 @@ class SettingsTab:
         self.clipboard_interval_var.set(settings.get("clipboard_interval", 3000) // 1000)
         self.theme_var.set(settings.get("theme", "dark"))
         
+        # Load cookie settings
+        self.cookie_method_var.set(settings.get("cookie_method", "none"))
+        self.cookie_browser_var.set(settings.get("cookie_browser", "chrome"))
+        self.cookie_file_path_var.set(settings.get("cookie_file_path", ""))
+        
+        # Update UI visibility based on cookie method
+        self.on_cookie_method_change()
+        
         if settings.get("download_path"):
             self.download_path_var.set(settings["download_path"])
         elif hasattr(self.app, 'queue_tab'):
@@ -438,6 +685,11 @@ class SettingsTab:
             self.app.settings["default_audio_only"] = self.default_audio_var.get()
             self.app.settings["auto_clipboard"] = self.auto_clipboard_var.get()
             self.app.settings["clipboard_interval"] = self.clipboard_interval_var.get() * 1000
+            
+            # Save cookie settings
+            self.app.settings["cookie_method"] = self.cookie_method_var.get()
+            self.app.settings["cookie_browser"] = self.cookie_browser_var.get()
+            self.app.settings["cookie_file_path"] = self.cookie_file_path_var.get()
 
             theme_changed = self.app.current_theme != self.theme_var.get()
 
@@ -456,8 +708,6 @@ class SettingsTab:
             messagebox.showerror("Error", f"Failed to save settings:\n{str(e)}")
     
     def reset_defaults(self):
-        from config import DEFAULT_SETTINGS
-        
         if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings to default values?"):
             self.download_mode_var.set(DEFAULT_SETTINGS.get("download_mode", "sequential"))
             self.parallel_limit_var.set(DEFAULT_SETTINGS.get("parallel_limit", 2))
@@ -468,7 +718,13 @@ class SettingsTab:
             self.clipboard_interval_var.set(DEFAULT_SETTINGS.get("clipboard_interval", 3000) // 1000)
             self.theme_var.set(DEFAULT_SETTINGS.get("theme", "dark"))
             
+            # Reset cookie settings
+            self.cookie_method_var.set(DEFAULT_SETTINGS.get("cookie_method", "none"))
+            self.cookie_browser_var.set(DEFAULT_SETTINGS.get("cookie_browser", "chrome"))
+            self.cookie_file_path_var.set(DEFAULT_SETTINGS.get("cookie_file_path", ""))
+            
             self.on_mode_change()
+            self.on_cookie_method_change()
             
             self.status_label.configure(text="Settings reset to defaults. Click Save to apply.", text_color=theme_manager.get_color("warning"))
     
