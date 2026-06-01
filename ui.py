@@ -204,19 +204,19 @@ class App:
         self.show_tab("queue")
     
     def build_sidebar(self):
-        """Create sidebar navigation buttons with icons"""
-        # Logo block
+        """Create sidebar navigation buttons with icons - Compact responsive version"""
+        # Logo block - reduce top padding
         logo_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        logo_frame.pack(fill="x", padx=16, pady=(20, 16))
+        logo_frame.pack(fill="x", padx=16, pady=(16, 8))
         
         icon_label = ctk.CTkLabel(
             logo_frame, 
             text="",
-            image=icon_manager.get("download", size=(24, 24)),
-            width=28,
-            height=28
+            image=icon_manager.get("download", size=(20, 20)),  # Smaller icon
+            width=24,
+            height=24
         )
-        icon_label.pack(side="left", padx=(0, 10))
+        icon_label.pack(side="left", padx=(0, 8))
         
         logo_text_frame = ctk.CTkFrame(logo_frame, fg_color="transparent")
         logo_text_frame.pack(side="left")
@@ -224,7 +224,7 @@ class App:
         title_label = ctk.CTkLabel(
             logo_text_frame, 
             text="Downloader", 
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),  # Smaller font
             text_color=theme_manager.get_color("text_primary")
         )
         title_label.pack(anchor="w")
@@ -232,25 +232,25 @@ class App:
         subtitle_label = ctk.CTkLabel(
             logo_text_frame, 
             text="yt-dlp", 
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=10),  # Smaller font
             text_color=theme_manager.get_color("muted")
         )
         subtitle_label.pack(anchor="w")
         
-        # Divider
+        # Divider - reduced padding
         divider = ctk.CTkFrame(self.sidebar, height=1, fg_color=theme_manager.get_color("border"), corner_radius=0)
-        divider.pack(fill="x", padx=16, pady=(0, 16))
+        divider.pack(fill="x", padx=16, pady=(8, 8))
         
-        # Library section
+        # Library section - tighter
         library_label = ctk.CTkLabel(
             self.sidebar, 
             text="LIBRARY", 
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=9),  # Smaller font
             text_color=theme_manager.get_color("secondary")
         )
         library_label.pack(anchor="w", padx=16, pady=(0, 4))
         
-        # Navigation buttons
+        # Navigation buttons - compact spacing
         nav_items = [
             (icon_manager.get("queue"), "Queue", "queue"),
             (icon_manager.get("videos"), "Videos", "videos"),
@@ -261,8 +261,9 @@ class App:
         self.nav_frames = {}
         
         for icon, text, tab_name in nav_items:
-            btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+            btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=32)
             btn_frame.pack(fill="x", padx=12, pady=1)
+            btn_frame.pack_propagate(False)
             
             # Active indicator
             indicator = ctk.CTkFrame(
@@ -278,9 +279,9 @@ class App:
                 text=text,
                 image=icon,
                 compound="left",
-                font=ctk.CTkFont(size=13),
-                height=36,
-                corner_radius=8,
+                font=ctk.CTkFont(size=12),  # Smaller font
+                height=28,  # Reduced from 32 to 28
+                corner_radius=6,
                 fg_color="transparent",
                 anchor="w",
                 hover_color="#1B4A3A",
@@ -291,21 +292,22 @@ class App:
             self.nav_buttons[tab_name] = btn
             self.nav_frames[tab_name] = (btn_frame, indicator)
         
-        # System section divider
+        # System section divider - tighter
         sys_divider = ctk.CTkFrame(self.sidebar, height=1, fg_color=theme_manager.get_color("border"), corner_radius=0)
-        sys_divider.pack(fill="x", padx=16, pady=(16, 12))
+        sys_divider.pack(fill="x", padx=16, pady=(12, 6))
         
         system_label = ctk.CTkLabel(
             self.sidebar, 
             text="SYSTEM", 
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=9),  # Smaller font
             text_color=theme_manager.get_color("secondary")
         )
         system_label.pack(anchor="w", padx=16, pady=(0, 4))
         
-        # Settings button
-        settings_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        # Settings button - compact
+        settings_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=32)
         settings_frame.pack(fill="x", padx=12, pady=1)
+        settings_frame.pack_propagate(False)
         
         settings_indicator = ctk.CTkFrame(
             settings_frame, 
@@ -320,9 +322,9 @@ class App:
             text="Settings",
             image=icon_manager.get("settings"),
             compound="left",
-            font=ctk.CTkFont(size=13),
-            height=36,
-            corner_radius=8,
+            font=ctk.CTkFont(size=12),  # Consistent font
+            height=28,  # Reduced to match nav buttons
+            corner_radius=6,
             fg_color="transparent",
             anchor="w",
             hover_color="#1B4A3A",
@@ -333,9 +335,9 @@ class App:
         self.nav_buttons["settings"] = settings_btn
         self.nav_frames["settings"] = (settings_frame, settings_indicator)
         
-        # Storage bar at bottom
+        # Storage bar at bottom - make more compact
         storage_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        storage_frame.pack(side="bottom", fill="x", padx=16, pady=(0, 20))
+        storage_frame.pack(side="bottom", fill="x", padx=16, pady=(0, 12))
         
         storage_header = ctk.CTkFrame(storage_frame, fg_color="transparent")
         storage_header.pack(fill="x", pady=(0, 4))
@@ -343,7 +345,7 @@ class App:
         storage_label = ctk.CTkLabel(
             storage_header, 
             text="Storage", 
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=10),
             text_color=theme_manager.get_color("greige")
         )
         storage_label.pack(side="left")
@@ -351,14 +353,14 @@ class App:
         self.storage_used_label = ctk.CTkLabel(
             storage_header, 
             text="0 GB", 
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=10),
             text_color=theme_manager.get_color("greige")
         )
         self.storage_used_label.pack(side="right")
         
         storage_track = ctk.CTkFrame(
             storage_frame, 
-            height=4, 
+            height=3,  # Smaller height
             fg_color=theme_manager.get_color("border"),
             corner_radius=2
         )
@@ -366,7 +368,7 @@ class App:
         
         self.storage_progress = ctk.CTkFrame(
             storage_track, 
-            height=4, 
+            height=3,  # Smaller height
             fg_color=theme_manager.get_color("accent"),
             corner_radius=2,
             width=0
