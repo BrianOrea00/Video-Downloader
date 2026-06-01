@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from downloader import Downloader
-from config import RESOLUTIONS
+from config import RESOLUTIONS, HISTORY_FILE
 from utils import save_history, load_queue, save_queue
 from icon_manager import icon_manager
 from theme_manager import theme_manager
@@ -10,6 +10,7 @@ import threading
 import subprocess
 import tkinter as tk
 import os
+import json
 
 
 class QueueTab:
@@ -456,6 +457,26 @@ class QueueTab:
         except Exception as e:
             pass
     
+    def check_duplicate_url(self, url):
+        """Check if URL already exists in queue or history"""
+        # Check in current queue (pending or downloading)
+        for item in self.queue:
+            if item.get("url") == url and item.get("status") in ["pending", "downloading"]:
+                return "queue", item
+        
+        # Check in history
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE, "r") as f:
+                    history = json.load(f)
+                    for item in history:
+                        if item.get("url") == url:
+                            return "history", item
+            except:
+                pass
+        
+        return None, None
+    
     def add_to_queue(self):
         if not self.url_var.get():
             messagebox.showwarning("Warning", "Please enter a video URL")
@@ -464,6 +485,36 @@ class QueueTab:
         if not self.path_var.get():
             messagebox.showwarning("Warning", "Please select a save path")
             return
+        
+        url = self.url_var.get()
+        
+        # Check for duplicates
+        duplicate_type, duplicate_item = self.check_duplicate_url(url)
+        
+        if duplicate_type == "queue":
+            # URL already in queue with pending/downloading status
+            response = messagebox.askyesno(
+                "Duplicate URL in Queue",
+                f"This URL is already in the queue with status: {duplicate_item.get('status')}\n\n"
+                f"Add it again anyway?"
+            )
+            if not response:
+                self.url_var.set("")  # Clear URL
+                return
+                
+        elif duplicate_type == "history":
+            # URL was previously downloaded
+            date_added = duplicate_item.get('date_added', 'unknown date')
+            status = duplicate_item.get('status', 'completed')
+            response = messagebox.askyesno(
+                "Previously Downloaded",
+                f"This URL was already downloaded on {date_added}\n"
+                f"Status: {status}\n\n"
+                f"Download again?"
+            )
+            if not response:
+                self.url_var.set("")  # Clear URL
+                return
         
         # Apply default settings
         default_res = self.app.settings.get("default_resolution", "720")
@@ -477,14 +528,14 @@ class QueueTab:
         
         # Get video title
         try:
-            info = self.downloader.get_info(self.url_var.get())
+            info = self.downloader.get_info(url)
             title = info.get('title', 'Unknown')
         except Exception as e:
-            title = self.url_var.get()[:50]
+            title = url[:50]
         
         # Create queue item
         queue_item = {
-            "url": self.url_var.get(),
+            "url": url,
             "path": self.path_var.get(),
             "resolution": self.res_var.get(),
             "audio_only": self.audio_only.get(),

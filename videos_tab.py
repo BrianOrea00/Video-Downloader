@@ -14,6 +14,7 @@ class VideosTab:
         self.frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.current_files = []
         self.vlc_path = None
+        self.empty_state = None  # Initialize as None
         
         self.build_ui()
     
@@ -96,7 +97,20 @@ class VideosTab:
         )
         self.list_container.pack(fill="both", expand=True)
         
-        # Empty state (initially hidden)
+        # Create empty state (but don't pack it yet)
+        self.create_empty_state()
+        
+        # Status bar
+        self.status_bar = ctk.CTkLabel(
+            self.frame,
+            text="Ready",
+            font=ctk.CTkFont(size=11),
+            text_color=theme_manager.get_color("secondary")
+        )
+        self.status_bar.pack(fill="x", pady=(12, 0))
+    
+    def create_empty_state(self):
+        """Create the empty state widget"""
         self.empty_state = ctk.CTkFrame(self.list_container, fg_color="transparent")
         
         empty_icon = ctk.CTkLabel(
@@ -122,15 +136,6 @@ class VideosTab:
             text_color=theme_manager.get_color("muted")
         )
         empty_sub.pack()
-        
-        # Status bar
-        self.status_bar = ctk.CTkLabel(
-            self.frame,
-            text="Ready",
-            font=ctk.CTkFont(size=11),
-            text_color=theme_manager.get_color("secondary")
-        )
-        self.status_bar.pack(fill="x", pady=(12, 0))
     
     def get_download_path(self):
         if hasattr(self.app, 'queue_tab'):
@@ -150,14 +155,19 @@ class VideosTab:
         download_path = self.get_download_path()
         
         if not download_path:
-            self.path_label.configure(text="No download folder selected")
-            self.status_bar.configure(text="Please select a download folder in Queue tab")
+            try:
+                self.path_label.configure(text="No download folder selected")
+                self.status_bar.configure(text="Please select a download folder in Queue tab")
+            except:
+                pass
             self.show_empty_state()
             return
         
-        self.path_label.configure(text=download_path, text_color=theme_manager.get_color("text_primary"))
-        self.status_bar.configure(text="Scanning for videos...")
-        self.frame.update()
+        try:
+            self.path_label.configure(text=download_path, text_color=theme_manager.get_color("text_primary"))
+            self.status_bar.configure(text="Scanning for videos...")
+        except:
+            pass
         
         video_extensions = ('.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv')
         
@@ -180,27 +190,59 @@ class VideosTab:
                         })
             
             self.current_files.sort(key=lambda x: x['size_bytes'], reverse=True)
-            self.filter_files()
-            self.status_bar.configure(text=f"Found {len(self.current_files)} video files")
+            
+            # Schedule UI update
+            self.frame.after(100, self.filter_files)
+            
+            try:
+                self.status_bar.configure(text=f"Found {len(self.current_files)} video files")
+            except:
+                pass
             
         except Exception as e:
-            self.status_bar.configure(text=f"Error scanning: {str(e)}")
+            try:
+                self.status_bar.configure(text=f"Error scanning: {str(e)[:50]}")
+            except:
+                pass
             self.show_empty_state()
     
     def show_empty_state(self):
-        for widget in self.list_container.winfo_children():
-            widget.destroy()
-        self.empty_state.pack(fill="both", expand=True)
+        """Safely show empty state"""
+        try:
+            # Clear container first
+            for widget in self.list_container.winfo_children():
+                try:
+                    widget.destroy()
+                except:
+                    pass
+            
+            # Recreate empty state
+            self.create_empty_state()
+            self.empty_state.pack(fill="both", expand=True)
+        except Exception as e:
+            print(f"Error showing empty state: {e}")
     
     def hide_empty_state(self):
-        self.empty_state.pack_forget()
+        """Safely hide empty state"""
+        try:
+            if self.empty_state and self.empty_state.winfo_exists():
+                self.empty_state.pack_forget()
+        except:
+            pass
     
     def filter_files(self):
         search_term = self.search_var.get().lower()
         
-        for widget in self.list_container.winfo_children():
-            if widget != self.empty_state:
-                widget.destroy()
+        # Safely clear the container
+        try:
+            for widget in self.list_container.winfo_children():
+                try:
+                    if widget != self.empty_state:
+                        widget.destroy()
+                except:
+                    pass
+        except:
+            pass
         
         filtered = [f for f in self.current_files if search_term in f['name'].lower()]
         
@@ -211,7 +253,10 @@ class VideosTab:
         self.hide_empty_state()
         
         for file_info in filtered:
-            self.create_file_row(file_info)
+            try:
+                self.create_file_row(file_info)
+            except Exception as e:
+                print(f"Error creating row: {e}")
     
     def create_file_row(self, file_info):
         row = ctk.CTkFrame(
@@ -352,8 +397,7 @@ class VideosTab:
         if messagebox.askyesno("Confirm Delete", f"Delete '{filename}'?\n\nThis action cannot be undone!"):
             try:
                 os.remove(filepath)
-                self.status_bar.configure(text=f"Deleted: {filename}")
-                self.refresh_files()
+                self.frame.after(500, self.refresh_files)
             except Exception as e:
                 messagebox.showerror("Delete Error", f"Failed to delete file:\n{str(e)}")
     

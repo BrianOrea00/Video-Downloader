@@ -3,10 +3,16 @@ import os
 from config import HISTORY_FILE, QUEUE_FILE, SETTINGS_FILE, DEFAULT_SETTINGS
 
 def save_history(data):
+    from datetime import datetime
+    
     if not os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, "w") as f:
             json.dump([], f)
-
+    
+    # Add date_added if not present
+    if "date_added" not in data:
+        data["date_added"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
     with open(HISTORY_FILE, "r+") as f:
         history = json.load(f)
         history.append(data)
