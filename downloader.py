@@ -7,11 +7,46 @@ class Downloader:
         self.process = None
         self.cancelled = False
 
-    def get_info(self, url):
-        with yt_dlp.YoutubeDL() as ydl:
+    def get_info(self, url, cookie_settings=None):
+        """Get video info with optional cookie support"""
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'ignoreerrors': True,
+            'no_color': True,
+        }
+        
+        # Add cookie options if provided
+        if cookie_settings:
+            self._add_cookie_options(ydl_opts, cookie_settings)
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             return ydl.extract_info(url, download=False)
+    
+    def _add_cookie_options(self, ydl_opts, cookie_settings):
+        """Add cookie-related options to ydl_opts based on settings"""
+        method = cookie_settings.get("cookie_method", "none")
+        
+        if method == "browser":
+            browser = cookie_settings.get("cookie_browser", "chrome")
+            # Support multiple browser names
+            browser_map = {
+                "chrome": "chrome",
+                "firefox": "firefox",
+                "edge": "edge",
+                "brave": "brave",
+                "opera": "opera",
+                "safari": "safari"
+            }
+            browser_name = browser_map.get(browser, "chrome")
+            ydl_opts['cookiesfrombrowser'] = (browser_name,)
+            
+        elif method == "file":
+            cookie_file = cookie_settings.get("cookie_file_path", "")
+            if cookie_file and cookie_file.strip():
+                ydl_opts['cookiefile'] = cookie_file.strip()
 
-    def download(self, url, path, resolution, progress_callback, done_callback, audio_only=False):
+    def download(self, url, path, resolution, progress_callback, done_callback, audio_only=False, cookie_settings=None):
         def run():
             self.cancelled = False
 
@@ -89,8 +124,11 @@ class Downloader:
                 'ignoreerrors': True,
                 'no_color': True,
             }
+            
+            # Add cookie options if provided
+            if cookie_settings:
+                self._add_cookie_options(ydl_opts, cookie_settings)
 
-# Replace line 133-136 in downloader.py
             if audio_only:
                 ydl_opts.update({
                     'format': 'bestaudio/best',
