@@ -19,6 +19,12 @@ class QueueTab:
         self.app = app
         self.frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.downloader = Downloader()
+        
+        # Threading locks for shared state
+        self.queue_lock = threading.Lock()
+        self.downloading_lock = threading.Lock()
+        self.current_item_lock = threading.Lock()
+        
         self.queue = load_queue()
         self.downloading = False
         self.active_downloads = []
@@ -460,9 +466,10 @@ class QueueTab:
     def check_duplicate_url(self, url):
         """Check if URL already exists in queue or history"""
         # Check in current queue (pending or downloading)
-        for item in self.queue:
-            if item.get("url") == url and item.get("status") in ["pending", "downloading"]:
-                return "queue", item
+        with self.queue_lock:
+            for item in self.queue:
+                if item.get("url") == url and item.get("status") in ["pending", "downloading"]:
+                    return "queue", item
         
         # Check in history
         if os.path.exists(HISTORY_FILE):
@@ -544,8 +551,10 @@ class QueueTab:
             "date_added": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        self.queue.append(queue_item)
-        save_queue(self.queue)
+        with self.queue_lock:
+            self.queue.append(queue_item)
+            save_queue(self.queue)
+        
         self.refresh_queue_display()
         
         # Clear URL
@@ -563,7 +572,10 @@ class QueueTab:
         for widget in self.queue_container.winfo_children():
             widget.destroy()
         
-        for i, item in enumerate(self.queue):
+        with self.queue_lock:
+            queue_copy = self.queue.copy()
+        
+        for i, item in enumerate(queue_copy):
             status = item.get("status", "pending")
             
             # Row card
@@ -711,15 +723,17 @@ class QueueTab:
         
         # Update app badge
         if hasattr(self.app, 'update_count_badge'):
-            pending_count = sum(1 for item in self.queue if item.get("status") == "pending")
+            with self.queue_lock:
+                pending_count = sum(1 for item in self.queue if item.get("status") == "pending")
             self.app.update_count_badge(pending_count)
     
     def remove_item(self, index):
         """Remove item at index"""
-        if index < len(self.queue):
-            del self.queue[index]
-            save_queue(self.queue)
-            self.refresh_queue_display()
+        with self.queue_lock:
+            if index < len(self.queue):
+                del self.queue[index]
+                save_queue(self.queue)
+        self.refresh_queue_display()
     
     def open_folder(self, path):
         """Open folder in file explorer"""
@@ -734,16 +748,18 @@ class QueueTab:
     
     def clear_completed(self):
         """Remove all completed items from queue"""
-        self.queue = [item for item in self.queue if item.get("status") != "completed"]
-        save_queue(self.queue)
+        with self.queue_lock:
+            self.queue = [item for item in self.queue if item.get("status") != "completed"]
+            save_queue(self.queue)
         self.refresh_queue_display()
     
     def get_queue_stats(self):
-        total = len(self.queue)
-        pending = sum(1 for item in self.queue if item.get("status") == "pending")
-        downloading = sum(1 for item in self.queue if item.get("status") == "downloading")
-        completed = sum(1 for item in self.queue if item.get("status") == "completed")
-        failed = sum(1 for item in self.queue if item.get("status") == "failed")
+        with self.queue_lock:
+            total = len(self.queue)
+            pending = sum(1 for item in self.queue if item.get("status") == "pending")
+            downloading = sum(1 for item in self.queue if item.get("status") == "downloading")
+            completed = sum(1 for item in self.queue if item.get("status") == "completed")
+            failed = sum(1 for item in self.queue if item.get("status") == "failed")
         
         return {
             "total": total,
@@ -761,15 +777,20 @@ class QueueTab:
         self.stat_chips["Done"].configure(text=f"Done: {stats['completed']}")
     
     def start_queue(self):
-        if self.downloading:
-            return
+        with self.downloading_lock:
+            if self.downloading:
+                return
         
-        pending = any(item.get("status") == "pending" for item in self.queue)
+        with self.queue_lock:
+            pending = any(item.get("status") == "pending" for item in self.queue)
+        
         if not pending:
             messagebox.showinfo("Queue Empty", "No pending downloads in queue")
             return
         
-        self.downloading = True
+        with self.downloading_lock:
+            self.downloading = True
+        
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         
@@ -779,33 +800,54 @@ class QueueTab:
         thread.start()
     
     def stop_queue(self):
-        self.downloading = False
-        if self.current_download_item:
-            self.downloader.cancel()
+        with self.downloading_lock:
+            self.downloading = False
+        
+        with self.current_item_lock:
+            if self.current_download_item:
+                self.downloader.cancel()
+        
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         self.update_stats_display()
     
     def process_queue(self):
-        for i, item in enumerate(self.queue):
-            if not self.downloading:
+        while True:
+            with self.downloading_lock:
+                if not self.downloading:
+                    break
+            
+            # Find next pending item
+            next_item = None
+            with self.queue_lock:
+                for item in self.queue:
+                    if item.get("status") == "pending":
+                        next_item = item
+                        break
+            
+            if not next_item:
                 break
             
-            if item.get("status") == "pending":
-                item["status"] = "downloading"
+            with self.queue_lock:
+                next_item["status"] = "downloading"
                 save_queue(self.queue)
-                
-                self.frame.after(0, lambda t=item['title']: self.active_title_label.configure(text=t[:60]))
-                self.frame.after(0, self.refresh_queue_display)
-                
-                self.download_item(item)
-                
-                while item.get("status") == "downloading" and self.downloading:
+            
+            self.frame.after(0, lambda t=next_item['title']: self.active_title_label.configure(text=t[:60]))
+            self.frame.after(0, self.refresh_queue_display)
+            
+            self.download_item(next_item)
+            
+            # Wait for download to complete (download_item blocks)
+            with self.current_item_lock:
+                while self.current_download_item is not None and self.downloading:
                     import time
                     time.sleep(0.5)
-                    self.frame.after(0, self.update_stats_display)
+            
+            self.frame.after(0, self.update_stats_display)
         
-        self.downloading = False
+        with self.downloading_lock:
+            self.downloading = False
+        
         self.frame.after(0, lambda: self.start_btn.configure(state="normal"))
         self.frame.after(0, lambda: self.stop_btn.configure(state="disabled"))
         self.frame.after(0, lambda: self.active_card.pack_forget())
@@ -814,7 +856,9 @@ class QueueTab:
         
     def download_item(self, item):
         download_complete = threading.Event()
-        self.current_download_item = item
+        
+        with self.current_item_lock:
+            self.current_download_item = item
         
         # Build cookie settings from app settings
         cookie_settings = {
@@ -846,7 +890,9 @@ class QueueTab:
         def done_callback(msg):
             def finalize():
                 if "completed" in msg.lower():
-                    item["status"] = "completed"
+                    with self.queue_lock:
+                        item["status"] = "completed"
+                    
                     save_history({
                         "url": item["url"],
                         "resolution": item["resolution"] if not item["audio_only"] else "Audio Only",
@@ -854,9 +900,12 @@ class QueueTab:
                     })
                     self.app.on_download_complete()
                 else:
-                    item["status"] = "failed"
+                    with self.queue_lock:
+                        item["status"] = "failed"
                 
-                save_queue(self.queue)
+                with self.queue_lock:
+                    save_queue(self.queue)
+                
                 self.refresh_queue_display()
                 
                 self.progress_bar.set(0)
@@ -864,6 +913,9 @@ class QueueTab:
                 self.speed_label.configure(text="")
                 self.eta_label.configure(text="")
                 self.bytes_label.configure(text="0 MB / 0 MB")
+                
+                with self.current_item_lock:
+                    self.current_download_item = None
                 
                 download_complete.set()
             
@@ -877,11 +929,10 @@ class QueueTab:
             update_progress,
             done_callback,
             audio_only=item["audio_only"],
-            cookie_settings=cookie_settings  # Pass cookie settings here
+            cookie_settings=cookie_settings
         )
         
         download_complete.wait()
-        self.current_download_item = None
     
     def show(self):
         self.frame.pack(fill="both", expand=True)
