@@ -1,0 +1,77 @@
+2026-07-06 11:34:38 - root - INFO - Starting Video Downloader
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 5743 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 5743 16 (unknown)
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4238 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 4238 16 (unknown)
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4354 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 4354 16 (unknown)
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4545 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 4545 16 (unknown)
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 8834 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 8834 16 (unknown)
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3653 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 3653 16 (unknown)
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 6355 16
+2026-07-06 11:34:38 - PIL.PngImagePlugin - DEBUG - b'deBG' 6355 16 (unknown)
+2026-07-06 11:34:39 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-07-06 11:34:39 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-07-06 11:34:39 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3653 16
+2026-07-06 11:34:39 - PIL.PngImagePlugin - DEBUG - b'deBG' 3653 16 (unknown)
+2026-07-06 11:35:40 - queue_tab - INFO - Preview fetched: FULL T1 TEAM Playing Ranked 5v5! - Doran | Oner | Faker | Peyz | Keria -HIGH ELO KR Pros Highlights
+2026-07-06 11:35:45 - queue_tab - INFO - Added to queue: FULL T1 TEAM Playing Ranked 5v5! - Doran | Oner | ...
+2026-07-06 11:35:45 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4663 16
+2026-07-06 11:35:45 - PIL.PngImagePlugin - DEBUG - b'deBG' 4663 16 (unknown)
+2026-07-06 11:35:54 - queue_tab - INFO - Added to queue: FULL T1 TEAM Playing Ranked 5v5! - Doran | Oner | ...
+2026-07-06 11:35:56 - downloader - INFO - Starting download: https://youtu.be/qVWVnir1WSk
+2026-07-06 11:37:38 - downloader - INFO - Cleared partial tracking for https://youtu.be/qVWVnir1WSk
+2026-07-06 11:37:38 - downloader - INFO - Download completed: https://youtu.be/qVWVnir1WSk
+2026-07-06 11:37:38 - queue_tab - INFO - Download completed: FULL T1 TEAM Playing Ranked 5v5! - Doran | Oner | Faker | Peyz | Keria -HIGH ELO KR Pros Highlights
+2026-07-06 11:37:55 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4354 16
+2026-07-06 11:37:55 - PIL.PngImagePlugin - DEBUG - b'deBG' 4354 16 (unknown)
+2026-07-06 11:37:55 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3582 16
+2026-07-06 11:37:55 - PIL.PngImagePlugin - DEBUG - b'deBG' 3582 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 5743 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 5743 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4238 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 4238 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4354 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 4354 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4545 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 4545 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 8834 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 8834 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3653 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 3653 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 6355 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 6355 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3653 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 3653 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 7141 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 7141 16 (unknown)
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-07-06 11:38:56 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 7141 16
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - b'deBG' 7141 16 (unknown)
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-07-06 11:39:05 - root - INFO - Application closed
