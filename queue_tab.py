@@ -40,6 +40,9 @@ class QueueTab:
         self.url_validation_timer = None
         self._sanitized_url = None
 
+        # Widget pool for queue rows
+        self.row_pool = []
+
         self.build_ui()
 
     def get_clipboard_text(self):
@@ -516,7 +519,6 @@ class QueueTab:
             return
 
         try:
-            # Use sanitized URL if available
             url = self._sanitized_url or self.url_var.get()
             info = self.downloader.get_info(url)
             if info:
@@ -526,13 +528,11 @@ class QueueTab:
 
     def check_duplicate_url(self, url):
         """Check if URL already exists in queue or history"""
-        # Check in current queue (pending or downloading)
         with self.queue_lock:
             for item in self.queue:
                 if item.get("url") == url and item.get("status") in ["pending", "downloading", "paused"]:
                     return "queue", item
 
-        # Check in history
         if os.path.exists(HISTORY_FILE):
             try:
                 with open(HISTORY_FILE, "r") as f:
@@ -554,10 +554,8 @@ class QueueTab:
             messagebox.showwarning("Warning", "Please select a save path")
             return
 
-        # Use sanitized URL if available
         url = self._sanitized_url or self.url_var.get()
 
-        # Check for duplicates
         duplicate_type, duplicate_item = self.check_duplicate_url(url)
 
         if duplicate_type == "queue":
@@ -584,7 +582,6 @@ class QueueTab:
                 self.url_var.set("")
                 return
 
-        # Apply default settings
         default_res = self.app.settings.get("default_resolution", "720")
         default_audio = self.app.settings.get("default_audio_only", False)
 
@@ -594,7 +591,6 @@ class QueueTab:
         if not self.audio_only.get() and default_audio:
             self.audio_only.set(True)
 
-        # Get video title
         try:
             info = self.downloader.get_info(url)
             title = info.get('title', 'Unknown')
@@ -602,7 +598,6 @@ class QueueTab:
             logger.error(f"Error getting title: {e}")
             title = url[:50]
 
-        # Create queue item
         queue_item = {
             "url": url,
             "path": self.path_var.get(),
@@ -621,193 +616,223 @@ class QueueTab:
 
         self.refresh_queue_display()
 
-        # Clear URL
         self.url_var.set("")
-
-        # Reset to defaults
         self.res_var.set(self.app.settings.get("default_resolution", "720"))
         self.audio_only.set(self.app.settings.get("default_audio_only", False))
 
         self.update_stats_display()
 
     def refresh_queue_display(self):
-        """Refresh queue display with card rows"""
-        # Clear existing widgets
-        for widget in self.queue_container.winfo_children():
-            widget.destroy()
-
+        """Refresh queue display using widget pooling."""
         with self.queue_lock:
             queue_copy = self.queue.copy()
 
+        # Ensure we have enough row widgets
+        while len(self.row_pool) < len(queue_copy):
+            row = self._create_row_widget()
+            self.row_pool.append(row)
+
+        # Update each row
         for i, item in enumerate(queue_copy):
-            status = item.get("status", "pending")
+            row = self.row_pool[i]
+            self._update_row(row, item, i)
+            if not row.winfo_ismapped():
+                row.pack(fill="x", pady=4)
 
-            # Row card
-            row = ctk.CTkFrame(
-                self.queue_container,
-                fg_color=theme_manager.get_color("card") if status not in ["pending", "paused"] else "#0A1A16",
-                border_width=1,
-                border_color=theme_manager.get_color("border"),
-                corner_radius=8
-            )
-            row.pack(fill="x", pady=4)
-
-            # Thumbnail placeholder
-            thumb = ctk.CTkFrame(
-                row,
-                width=40,
-                height=28,
-                fg_color=theme_manager.get_color("surface"),
-                corner_radius=4
-            )
-            thumb.pack(side="left", padx=12, pady=10)
-            thumb.pack_propagate(False)
-
-            _thumb_icon = icon_manager.get("download_sm") if not item.get("audio_only") else icon_manager.get("music_sm")
-            icon_label = ctk.CTkLabel(
-                thumb,
-                text="",
-                image=_thumb_icon,
-            )
-            icon_label.pack(expand=True)
-
-            # Middle section - title and chips
-            middle = ctk.CTkFrame(row, fg_color="transparent")
-            middle.pack(side="left", fill="x", expand=True, padx=(0, 12), pady=10)
-
-            # Title
-            title_color = theme_manager.get_color("greige") if status == "completed" else theme_manager.get_color("text_primary")
-            title_label = ctk.CTkLabel(
-                middle,
-                text=item.get('title', 'Unknown')[:60],
-                font=ctk.CTkFont(size=13, weight="bold" if status != "completed" else "normal"),
-                text_color=title_color,
-                anchor="w"
-            )
-            title_label.pack(anchor="w")
-
-            # Chips row
-            chips_row = ctk.CTkFrame(middle, fg_color="transparent")
-            chips_row.pack(anchor="w", pady=(4, 0))
-
-            # Resolution/Format chip
-            res_text = f"{item.get('resolution', 'N/A')}p"
-            if item.get('audio_only'):
-                res_text = "MP3"
-
-            res_chip = ctk.CTkFrame(
-                chips_row,
-                fg_color=theme_manager.get_color("surface"),
-                border_width=1,
-                border_color=theme_manager.get_color("mid"),
-                corner_radius=4
-            )
-            res_chip.pack(side="left", padx=(0, 6))
-
-            res_label = ctk.CTkLabel(
-                res_chip,
-                text=res_text,
-                font=ctk.CTkFont(size=10),
-                text_color=theme_manager.get_color("accent")
-            )
-            res_label.pack(padx=6, pady=2)
-
-            # Status dot
-            if status == "pending":
-                dot_color = theme_manager.get_color("mid")
-                dot_text = "Pending"
-            elif status == "downloading":
-                dot_color = theme_manager.get_color("warning")
-                dot_text = "Downloading"
-            elif status == "completed":
-                dot_color = theme_manager.get_color("success")
-                dot_text = "Completed"
-            elif status == "failed":
-                dot_color = theme_manager.get_color("error")
-                dot_text = "Failed"
-            elif status == "paused":
-                dot_color = theme_manager.get_color("warning")
-                dot_text = "Paused"
-            else:
-                dot_color = theme_manager.get_color("mid")
-                dot_text = "Pending"
-
-            status_chip = ctk.CTkFrame(
-                chips_row,
-                fg_color=theme_manager.get_color("surface"),
-                border_width=1,
-                border_color=dot_color,
-                corner_radius=4
-            )
-            status_chip.pack(side="left")
-
-            status_label = ctk.CTkLabel(
-                status_chip,
-                text=f"● {dot_text}",
-                font=ctk.CTkFont(size=10),
-                text_color=dot_color
-            )
-            status_label.pack(padx=6, pady=2)
-
-            # Right side - action buttons
-            actions = ctk.CTkFrame(row, fg_color="transparent")
-            actions.pack(side="right", padx=12, pady=10)
-
-            folder_btn = ctk.CTkButton(
-                actions,
-                text="",
-                image=icon_manager.get("folder_sm"),
-                width=28,
-                height=28,
-                fg_color="transparent",
-                border_width=1,
-                border_color=theme_manager.get_color("border"),
-                text_color=theme_manager.get_color("muted"),
-                hover_color=theme_manager.get_color("surface"),
-                corner_radius=6,
-                command=lambda p=item.get('path', ''): self.open_folder(p)
-            )
-            folder_btn.pack(side="left", padx=2)
-
-            # Resume button for paused items
-            if status == "paused":
-                resume_btn = ctk.CTkButton(
-                    actions,
-                    text="",
-                    image=icon_manager.get("refresh", size=(14, 14)),
-                    width=28,
-                    height=28,
-                    fg_color=theme_manager.get_color("warning"),
-                    text_color="#FFFFFF",
-                    corner_radius=6,
-                    command=lambda idx=i: self.resume_item(idx)
-                )
-                resume_btn.pack(side="left", padx=2)
-
-            if status != "downloading":
-                delete_btn = ctk.CTkButton(
-                    actions,
-                    text="",
-                    image=icon_manager.get("trash_sm"),
-                    width=28,
-                    height=28,
-                    fg_color="transparent",
-                    border_width=1,
-                    border_color=theme_manager.get_color("error"),
-                    text_color=theme_manager.get_color("error"),
-                    hover_color=theme_manager.get_color("surface"),
-                    corner_radius=6,
-                    command=lambda idx=i: self.remove_item(idx)
-                )
-                delete_btn.pack(side="left", padx=2)
+        # Hide extra rows
+        for i in range(len(queue_copy), len(self.row_pool)):
+            self.row_pool[i].pack_forget()
 
         self.update_stats_display()
 
-        # Update app badge
         if hasattr(self.app, 'update_count_badge'):
-            with self.queue_lock:
-                pending_count = sum(1 for item in self.queue if item.get("status") in ["pending", "paused"])
+            pending_count = sum(1 for item in queue_copy if item.get("status") in ["pending", "paused"])
             self.app.update_count_badge(pending_count)
+
+    def _create_row_widget(self):
+        """Create a new row frame with static structure."""
+        row = ctk.CTkFrame(
+            self.queue_container,
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            corner_radius=8
+        )
+        # Store sub‑widget references
+        row.thumb_icon = None
+        row.title_label = None
+        row.res_chip_label = None
+        row.status_chip_label = None
+        row.folder_btn = None
+        row.resume_btn = None
+        row.delete_btn = None
+        self._build_row_structure(row)
+        return row
+
+    def _build_row_structure(self, row):
+        # Thumbnail placeholder
+        thumb = ctk.CTkFrame(
+            row,
+            width=40,
+            height=28,
+            fg_color=theme_manager.get_color("surface"),
+            corner_radius=4
+        )
+        thumb.pack(side="left", padx=12, pady=10)
+        thumb.pack_propagate(False)
+        row.thumb_icon = ctk.CTkLabel(thumb, text="")
+        row.thumb_icon.pack(expand=True)
+
+        # Middle section
+        middle = ctk.CTkFrame(row, fg_color="transparent")
+        middle.pack(side="left", fill="x", expand=True, padx=(0, 12), pady=10)
+
+        row.title_label = ctk.CTkLabel(
+            middle,
+            text="",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            anchor="w"
+        )
+        row.title_label.pack(anchor="w")
+
+        # Chips row
+        chips_row = ctk.CTkFrame(middle, fg_color="transparent")
+        chips_row.pack(anchor="w", pady=(4, 0))
+
+        row.res_chip = ctk.CTkFrame(
+            chips_row,
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("mid"),
+            corner_radius=4
+        )
+        row.res_chip.pack(side="left", padx=(0, 6))
+        row.res_chip_label = ctk.CTkLabel(
+            row.res_chip,
+            text="",
+            font=ctk.CTkFont(size=10),
+            text_color=theme_manager.get_color("accent")
+        )
+        row.res_chip_label.pack(padx=6, pady=2)
+
+        row.status_chip = ctk.CTkFrame(
+            chips_row,
+            fg_color=theme_manager.get_color("surface"),
+            border_width=1,
+            border_color=theme_manager.get_color("mid"),
+            corner_radius=4
+        )
+        row.status_chip.pack(side="left")
+        row.status_chip_label = ctk.CTkLabel(
+            row.status_chip,
+            text="",
+            font=ctk.CTkFont(size=10)
+        )
+        row.status_chip_label.pack(padx=6, pady=2)
+
+        # Actions
+        actions = ctk.CTkFrame(row, fg_color="transparent")
+        actions.pack(side="right", padx=12, pady=10)
+
+        row.folder_btn = ctk.CTkButton(
+            actions,
+            text="",
+            image=icon_manager.get("folder_sm"),
+            width=28,
+            height=28,
+            fg_color="transparent",
+            border_width=1,
+            border_color=theme_manager.get_color("border"),
+            text_color=theme_manager.get_color("muted"),
+            hover_color=theme_manager.get_color("surface"),
+            corner_radius=6
+        )
+        row.folder_btn.pack(side="left", padx=2)
+
+        row.resume_btn = ctk.CTkButton(
+            actions,
+            text="",
+            image=icon_manager.get("refresh", size=(14, 14)),
+            width=28,
+            height=28,
+            fg_color=theme_manager.get_color("warning"),
+            text_color="#FFFFFF",
+            corner_radius=6
+        )
+        row.resume_btn.pack(side="left", padx=2)
+
+        row.delete_btn = ctk.CTkButton(
+            actions,
+            text="",
+            image=icon_manager.get("trash_sm"),
+            width=28,
+            height=28,
+            fg_color="transparent",
+            border_width=1,
+            border_color=theme_manager.get_color("error"),
+            text_color=theme_manager.get_color("error"),
+            hover_color=theme_manager.get_color("surface"),
+            corner_radius=6
+        )
+        row.delete_btn.pack(side="left", padx=2)
+
+    def _update_row(self, row, item, index):
+        """Populate an existing row with data from a queue item."""
+        status = item.get("status", "pending")
+        title = item.get("title", "Unknown")[:60]
+        res_text = f"{item.get('resolution', 'N/A')}p" if not item.get('audio_only') else "MP3"
+
+        # 🎨 Set background based on status and current theme
+        if status in ["pending", "paused"]:
+            row.configure(fg_color=theme_manager.get_color("surface"))   # light grey in light mode, dark grey in dark
+        else:
+            row.configure(fg_color=theme_manager.get_color("card"))
+
+        # Title
+        title_color = theme_manager.get_color("greige") if status == "completed" else theme_manager.get_color("text_primary")
+        row.title_label.configure(text=title, text_color=title_color,
+                                  font=ctk.CTkFont(size=13, weight="bold" if status != "completed" else "normal"))
+
+        # Resolution chip
+        row.res_chip_label.configure(text=res_text)
+
+        # Status chip
+        dot_color = {
+            "pending": theme_manager.get_color("mid"),
+            "downloading": theme_manager.get_color("warning"),
+            "completed": theme_manager.get_color("success"),
+            "failed": theme_manager.get_color("error"),
+            "paused": theme_manager.get_color("warning")
+        }.get(status, theme_manager.get_color("mid"))
+        dot_text = {
+            "pending": "Pending",
+            "downloading": "Downloading",
+            "completed": "Completed",
+            "failed": "Failed",
+            "paused": "Paused"
+        }.get(status, "Pending")
+        row.status_chip_label.configure(text=f"● {dot_text}", text_color=dot_color)
+        row.status_chip.configure(border_color=dot_color)
+
+        # Thumbnail icon
+        icon = icon_manager.get("download_sm") if not item.get("audio_only") else icon_manager.get("music_sm")
+        row.thumb_icon.configure(image=icon)
+
+        # Folder button
+        row.folder_btn.configure(command=lambda p=item.get('path', ''): self.open_folder(p))
+
+        # Resume button – only for paused
+        if status == "paused":
+            row.resume_btn.pack(side="left", padx=2)
+            row.resume_btn.configure(command=lambda idx=index: self.resume_item(idx))
+        else:
+            row.resume_btn.pack_forget()
+
+        # Delete button – not for downloading
+        if status != "downloading":
+            row.delete_btn.pack(side="left", padx=2)
+            row.delete_btn.configure(command=lambda idx=index: self.remove_item(idx))
+        else:
+            row.delete_btn.pack_forget()
 
     def resume_item(self, index):
         """Resume a paused download."""
@@ -819,7 +844,6 @@ class QueueTab:
                     save_queue(self.queue)
                     logger.info(f"Resumed item: {item.get('title', 'Unknown')}")
         self.refresh_queue_display()
-        # Auto-start queue if not running
         self.start_queue()
 
     def remove_item(self, index):
@@ -914,7 +938,6 @@ class QueueTab:
                 if not self.downloading:
                     break
 
-            # Find next pending item (including paused items that were resumed)
             next_item = None
             with self.queue_lock:
                 for item in self.queue:
@@ -934,7 +957,6 @@ class QueueTab:
 
             self.download_item(next_item)
 
-            # Wait for download to complete (download_item blocks)
             with self.current_item_lock:
                 while self.current_download_item is not None and self.downloading:
                     import time
@@ -957,7 +979,6 @@ class QueueTab:
         with self.current_item_lock:
             self.current_download_item = item
 
-        # Build cookie settings from app settings
         cookie_settings = {
             "cookie_method": self.app.settings.get("cookie_method", "none"),
             "cookie_browser": self.app.settings.get("cookie_browser", "chrome"),
