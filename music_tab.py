@@ -9,7 +9,7 @@ from mutagen.flac import FLAC
 from mutagen.mp4 import MP4
 from icon_manager import icon_manager
 from theme_manager import theme_manager
-
+from logger import logger
 
 class MusicTab:
     def __init__(self, parent, app):
@@ -199,7 +199,7 @@ class MusicTab:
                     duration_str = self.extract_duration_from_filename(filename)
                     
         except Exception as e:
-            print(f"Error reading metadata for {filename}: {e}")
+            logger.error(f"Error reading metadata for {filename}: {e}")
             # Fallback: try to get duration using ffprobe
             duration_str = self.get_duration_ffprobe(filepath)
             if duration_str == "0:00":
@@ -228,7 +228,7 @@ class MusicTab:
                             seconds = int(duration % 60)
                             return f"{minutes}:{seconds:02d}"
         except Exception as e:
-            print(f"ffprobe failed: {e}")
+            logger.debug(f"ffprobe failed: {e}")
         return "0:00"
 
     def extract_duration_from_filename(self, filename):
@@ -331,7 +331,7 @@ class MusicTab:
             self.create_empty_state()
             self.empty_state.pack(fill="both", expand=True)
         except Exception as e:
-            print(f"Error showing empty state: {e}")
+            logger.error(f"Error showing empty state: {e}")
     
     def hide_empty_state(self):
         """Safely hide empty state"""
@@ -367,7 +367,7 @@ class MusicTab:
             try:
                 self.create_file_row(file_info)
             except Exception as e:
-                print(f"Error creating row: {e}")
+                logger.error(f"Error creating row: {e}")
     
     def create_file_row(self, file_info):
         row = ctk.CTkFrame(

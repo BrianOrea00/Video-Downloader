@@ -5,6 +5,7 @@ import subprocess
 from datetime import datetime
 from icon_manager import icon_manager
 from theme_manager import theme_manager
+from logger import logger
 
 
 class VideosTab:
@@ -220,7 +221,7 @@ class VideosTab:
             self.create_empty_state()
             self.empty_state.pack(fill="both", expand=True)
         except Exception as e:
-            print(f"Error showing empty state: {e}")
+            logger.error(f"Error showing empty state: {e}")
     
     def hide_empty_state(self):
         """Safely hide empty state"""
@@ -256,7 +257,7 @@ class VideosTab:
             try:
                 self.create_file_row(file_info)
             except Exception as e:
-                print(f"Error creating row: {e}")
+                logger.error(f"Error creating row: {e}")
     
     def create_file_row(self, file_info):
         row = ctk.CTkFrame(

@@ -75,3 +75,37 @@
 2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
 2026-07-06 11:39:01 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
 2026-07-06 11:39:05 - root - INFO - Application closed
+2026-09-05 22:28:10 - root - INFO - Starting Video Downloader
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 5743 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 5743 16 (unknown)
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 3892
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4238 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 4238 16 (unknown)
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4354 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 4354 16 (unknown)
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4545 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 4545 16 (unknown)
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 8834 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 8834 16 (unknown)
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3653 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 3653 16 (unknown)
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 6355 16
+2026-09-05 22:28:10 - PIL.PngImagePlugin - DEBUG - b'deBG' 6355 16 (unknown)
+2026-09-05 22:28:11 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3945 16
+2026-09-05 22:28:11 - PIL.PngImagePlugin - DEBUG - b'deBG' 3945 16 (unknown)
+2026-09-05 22:28:11 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 3653 16
+2026-09-05 22:28:11 - PIL.PngImagePlugin - DEBUG - b'deBG' 3653 16 (unknown)
+2026-09-05 22:28:26 - queue_tab - INFO - Preview fetched: Sa Susunod Na Lang LYRIC VIDEO - Skusta Clee ft. Yuri (Prod. by Flip-D)
+2026-09-05 22:28:30 - queue_tab - INFO - Added to queue: Sa Susunod Na Lang LYRIC VIDEO - Skusta Clee ft. Y...
+2026-09-05 22:28:30 - PIL.PngImagePlugin - DEBUG - STREAM b'deBG' 4663 16
+2026-09-05 22:28:30 - PIL.PngImagePlugin - DEBUG - b'deBG' 4663 16 (unknown)
+2026-09-05 22:28:32 - downloader - INFO - Starting download: https://youtu.be/XJBHA0_uGcY
+2026-09-05 22:28:39 - downloader - INFO - Cleared partial tracking for https://youtu.be/XJBHA0_uGcY
+2026-09-05 22:28:39 - downloader - INFO - Download completed: https://youtu.be/XJBHA0_uGcY
+2026-09-05 22:28:39 - queue_tab - INFO - Download completed: Sa Susunod Na Lang LYRIC VIDEO - Skusta Clee ft. Yuri (Prod. by Flip-D)
+2026-09-05 22:28:56 - root - INFO - Application closed
