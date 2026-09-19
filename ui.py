@@ -7,6 +7,7 @@ from music_tab import MusicTab
 from settings_tab import SettingsTab
 from icon_manager import icon_manager
 from theme_manager import theme_manager
+from logger import logger
 import subprocess
 import os
 
@@ -30,7 +31,7 @@ class App:
         # Detect VLC
         self.vlc_path = detect_vlc()
         if not self.vlc_path:
-            print("Warning: VLC not found. Media playback will be disabled.")
+            logger.warning("Warning: VLC not found. Media playback will be disabled.")
         
         # Current active tab
         self.current_tab = None

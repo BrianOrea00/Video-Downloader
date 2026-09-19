@@ -12,3 +12,12 @@ __pycache__/
 # Project files
 history.json
 queue.json
+
+# Logs
+logs/
+*.log
+
+# Settings
+settings.json
+
+queue.json
