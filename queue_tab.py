@@ -33,9 +33,12 @@ class QueueTab:
         # Load queue
         with self.queue_lock:
             self.queue = load_queue()
+            self._rehabilitate_queue()
 
         self.downloading = False
         self.active_downloaders = []   # list of Downloader objects
+        self._stop_event = threading.Event()
+        self._run_gen = 0
 
         # URL validation
         self.url_validation_timer = None
@@ -477,6 +480,16 @@ class QueueTab:
         except Exception as e:
             logger.error(f"Preview failed: {e}")
 
+    def _rehabilitate_queue(self):
+        """Downgrade items left as 'downloading' (e.g. after a crash) to 'pending'."""
+        changed = False
+        for item in self.queue:
+            if item.get("status") == "downloading":
+                item["status"] = "pending"
+                changed = True
+        if changed:
+            save_queue(self.queue)
+
     # ------------------------------------------------------------
     # Queue management (add, remove, duplicate check)
     # ------------------------------------------------------------
@@ -742,13 +755,21 @@ class QueueTab:
             row.delete_btn.pack_forget()
 
     def resume_item(self, index):
+        with self.downloading_lock:
+            if self.downloading:
+                messagebox.showinfo(
+                    "Queue Busy",
+                    "Downloads are running. Stop the queue before resuming items."
+                )
+                return
         with self.queue_lock:
-            if index < len(self.queue):
-                item = self.queue[index]
-                if item.get('status') == 'paused':
-                    item['status'] = 'pending'
-                    save_queue(self.queue)
-                    logger.info(f"Resumed item: {item.get('title', 'Unknown')}")
+            if index >= len(self.queue):
+                return
+            item = self.queue[index]
+            if item.get('status') == 'paused':
+                item['status'] = 'pending'
+                save_queue(self.queue)
+                logger.info(f"Resumed item: {item.get('title', 'Unknown')}")
         self.refresh_queue_display()
         self.start_queue()
 
@@ -800,13 +821,20 @@ class QueueTab:
         with self.downloading_lock:
             if self.downloading:
                 return
+
         with self.queue_lock:
             pending_items = [item for item in self.queue if item.get("status") in ["pending", "paused"]]
         if not pending_items:
             messagebox.showinfo("Queue Empty", "No pending downloads in queue")
             return
 
-        self.downloading = True
+        with self.downloading_lock:
+            if self.downloading:
+                return
+            self.downloading = True
+            self._run_gen += 1
+            gen = self._run_gen
+            self._stop_event = threading.Event()
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         self.active_card.pack(fill="x", pady=(0, 16))
@@ -817,46 +845,61 @@ class QueueTab:
         self.eta_label.configure(text="")
         self.bytes_label.configure(text="0 MB / 0 MB")
 
-        thread = threading.Thread(target=self.process_queue, daemon=True)
+        thread = threading.Thread(target=self.process_queue, args=(gen,), daemon=True)
         thread.start()
 
     def stop_queue(self):
+        self._stop_event.set()
         with self.downloading_lock:
+            if not self.downloading:
+                return
             self.downloading = False
         with self.active_downloaders_lock:
-            for d in self.active_downloaders:
-                d.cancel()
+            downloaders = list(self.active_downloaders)
             self.active_downloaders.clear()
+        for d in downloaders:
+            d.cancel()
+        with self.queue_lock:
+            for item in self.queue:
+                if item.get("status") == "downloading":
+                    item["status"] = "paused"
+            save_queue(self.queue)
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         self.update_stats_display()
         self.active_card.pack_forget()
         self.refresh_queue_display()
 
-    def process_queue(self):
+    def process_queue(self, gen):
         with self.queue_lock:
             pending_items = [item for item in self.queue if item.get("status") in ["pending", "paused"]]
         if not pending_items:
-            self.finish_queue()
+            self.finish_queue(gen)
+            return
+        if gen != self._run_gen or self._stop_event.is_set():
             return
 
         parallel_limit = self.app.settings.get("parallel_limit", 2)
         logger.info(f"Starting parallel downloads (max {parallel_limit})")
 
-        # Mark all as downloading
+        # Mark all as downloading. Re-check the stop token inside the lock so a
+        # stop that raced with us cannot leave items stuck in 'downloading'.
         with self.queue_lock:
+            if gen != self._run_gen or self._stop_event.is_set():
+                return
             for item in pending_items:
                 item["status"] = "downloading"
             save_queue(self.queue)
         self.frame.after(0, self.refresh_queue_display)
         self.frame.after(0, self.update_stats_display)
 
-        self.active_downloaders = []  # will be filled as they start
+        with self.active_downloaders_lock:
+            self.active_downloaders.clear()  # will be filled as they start
 
         with ThreadPoolExecutor(max_workers=parallel_limit) as executor:
             futures = []
             for item in pending_items:
-                future = executor.submit(self.download_item_thread, item)
+                future = executor.submit(self.download_item_thread, item, gen)
                 futures.append((future, item))
 
             for future, item in futures:
@@ -865,11 +908,22 @@ class QueueTab:
                 except Exception as e:
                     logger.error(f"Download failed for {item.get('title', 'Unknown')}: {e}")
 
-        self.finish_queue()
+        self.finish_queue(gen)
 
-    def download_item_thread(self, item):
-        """Runs in a separate thread for each item."""
+    def download_item_thread(self, item, gen):
+        """Runs in a separate thread for each item.
+
+        Skips the work outright if this future belongs to a stale run (the queue
+        was stopped and restarted) or a stop was requested before it began.
+        """
+        if gen != self._run_gen or self._stop_event.is_set():
+            # A stop already paused the running items; a restart already owns
+            # them. Do not touch status here to avoid clobbering the new run.
+            logger.info(f"Skipped item after stop/restart: {item.get('title', 'Unknown')}")
+            return
+
         downloader = Downloader()
+        stop_event = self._stop_event
         with self.active_downloaders_lock:
             self.active_downloaders.append(downloader)
 
@@ -899,7 +953,8 @@ class QueueTab:
                 done_callback,
                 audio_only=item["audio_only"],
                 cookie_settings=cookie_settings,
-                max_retries=3
+                max_retries=3,
+                stop_event=stop_event,
             )
             # Wait for the done_callback to set the event (or until cancelled)
             while not done_event.is_set() and self.downloading:
@@ -907,7 +962,9 @@ class QueueTab:
         except Exception as e:
             logger.error(f"Error in download thread: {e}")
             with self.queue_lock:
-                if item.get("status") != "paused":
+                if self._stop_event.is_set() or item.get("status") == "paused":
+                    item["status"] = "paused"
+                else:
                     item["status"] = "failed"
                 save_queue(self.queue)
             done_event.set()
@@ -922,8 +979,9 @@ class QueueTab:
         # Could also update per‑row progress if we add progress bars.
         pass
 
-    def _handle_done(self, item, msg, downloader):
-        if "completed" in msg.lower():
+    def _handle_done(self, item, msg, downloader=None):
+        lower = (msg or "").lower()
+        if "completed" in lower:
             with self.queue_lock:
                 item["status"] = "completed"
             save_history({
@@ -933,6 +991,10 @@ class QueueTab:
             })
             self.app.on_download_complete()
             logger.info(f"Download completed: {item.get('title', 'Unknown')}")
+        elif "cancel" in lower or "stop" in lower:
+            with self.queue_lock:
+                item["status"] = "paused"
+            logger.info(f"Download paused: {item.get('title', 'Unknown')}")
         else:
             with self.queue_lock:
                 if item.get("status") != "paused":
@@ -944,7 +1006,7 @@ class QueueTab:
         self.update_stats_display()
         self._update_active_card_summary()
         with self.active_downloaders_lock:
-            if downloader in self.active_downloaders:
+            if downloader and downloader in self.active_downloaders:
                 self.active_downloaders.remove(downloader)
 
     def _update_active_card_summary(self):
@@ -968,8 +1030,12 @@ class QueueTab:
         self.speed_label.configure(text=f"{total} active")
         self.eta_label.configure(text="")
 
-    def finish_queue(self):
+    def finish_queue(self, gen):
+        if gen != self._run_gen or self._stop_event.is_set():
+            return
         with self.downloading_lock:
+            if gen != self._run_gen or self._stop_event.is_set():
+                return
             self.downloading = False
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")

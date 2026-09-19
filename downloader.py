@@ -121,8 +121,17 @@ class Downloader:
             logger.error(f"Failed to clear partial tracking: {e}")
 
     def download(self, url, path, resolution, progress_callback, done_callback,
-                 audio_only=False, cookie_settings=None, max_retries=3, backoff_factor=2):
+                 audio_only=False, cookie_settings=None, max_retries=3, backoff_factor=2,
+                 stop_event=None):
+        def stopped():
+            return stop_event is not None and stop_event.is_set()
+
         def run():
+            if stopped():
+                logger.info(f"Download aborted before start (stop requested): {url}")
+                done_callback("Download stopped")
+                return
+
             self.cancelled = False
             self._partial_file = None
 
@@ -133,7 +142,7 @@ class Downloader:
             attempt = 0
             last_exception = None
 
-            while attempt < max_retries and not self.cancelled:
+            while attempt < max_retries and not self.cancelled and not stopped():
                 attempt += 1
                 logger.info(f"Download attempt {attempt}/{max_retries} for {url}")
                 progress_callback({
@@ -144,8 +153,8 @@ class Downloader:
                 })
 
                 def hook(d):
-                    if self.cancelled:
-                        raise Exception("Download cancelled by user")
+                    if self.cancelled or stopped():
+                        raise Exception("Download stopped")
                     if d['status'] == 'downloading' and 'filename' in d:
                         self._partial_file = d['filename']
                     if d['status'] == 'downloading':
@@ -229,16 +238,19 @@ class Downloader:
                     logger.info(f"Starting download: {url}")
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         ydl.download([url])
-                    if not self.cancelled:
-                        self._clear_partial_tracking(url)
-                        logger.info(f"Download completed: {url}")
-                        done_callback("Download completed successfully!")
+                    if self.cancelled or stopped():
+                        logger.info(f"Download stopped: {url}")
+                        done_callback("Download stopped")
+                        return
+                    self._clear_partial_tracking(url)
+                    logger.info(f"Download completed: {url}")
+                    done_callback("Download completed successfully!")
                     return
                 except Exception as e:
                     last_exception = e
-                    if self.cancelled:
-                        logger.info(f"Download cancelled: {url}")
-                        done_callback("Download cancelled by user")
+                    if self.cancelled or stopped():
+                        logger.info(f"Download stopped: {url}")
+                        done_callback("Download stopped")
                         return
                     error_msg = str(e).lower()
                     is_retryable = any(keyword in error_msg for keyword in [
@@ -259,7 +271,7 @@ class Downloader:
                     })
                     time.sleep(wait_time)
 
-            if not self.cancelled:
+            if not self.cancelled and not stopped():
                 if self._partial_file:
                     self._save_partial_tracking(url, self._partial_file)
                 error_msg = str(last_exception) if last_exception else "Unknown error"
