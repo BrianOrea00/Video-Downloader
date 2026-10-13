@@ -175,7 +175,7 @@ class QueueTab:
         res_pill_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
         res_pill_frame.pack(side="left", padx=(0, 10))
         self.res_var = ctk.StringVar(value="720")
-        for res in ["720", "1080"]:
+        for res in RESOLUTIONS:
             pill = ctk.CTkButton(
                 res_pill_frame,
                 text=f"{res}p",
@@ -192,7 +192,6 @@ class QueueTab:
             )
             pill.pack(side="left", padx=2)
             self.res_pills[res] = pill
-        self.set_resolution("720")
 
         # Audio pill
         self.audio_only = ctk.BooleanVar(value=False)
@@ -211,6 +210,7 @@ class QueueTab:
             command=self.toggle_audio
         )
         self.audio_pill.pack(side="left")
+        self._apply_defaults_to_inputs()
 
         # Path row
         path_frame = ctk.CTkFrame(self.input_card, fg_color="transparent")
@@ -416,6 +416,16 @@ class QueueTab:
             self.url_entry.configure(border_color=theme_manager.get_color("error"))
             self._sanitized_url = None
 
+    def _default_resolution(self):
+        default_res = self.app.settings.get("default_resolution", "720")
+        return default_res if default_res in RESOLUTIONS else "720"
+
+    def _apply_defaults_to_inputs(self):
+        settings = self.app.settings
+        self.set_resolution(self._default_resolution())
+        self.audio_only.set(settings.get("default_audio_only", False))
+        self._sync_audio_pill()
+
     def set_resolution(self, res):
         self.res_var.set(res)
         for pill_res, pill in self.res_pills.items():
@@ -433,8 +443,10 @@ class QueueTab:
                 )
 
     def toggle_audio(self):
-        current = self.audio_only.get()
-        self.audio_only.set(not current)
+        self.audio_only.set(not self.audio_only.get())
+        self._sync_audio_pill()
+
+    def _sync_audio_pill(self):
         if self.audio_only.get():
             self.audio_pill.configure(
                 border_color=theme_manager.get_color("accent"),
@@ -535,12 +547,6 @@ class QueueTab:
             ):
                 self.url_var.set("")
                 return
-        default_res = self.app.settings.get("default_resolution", "720")
-        default_audio = self.app.settings.get("default_audio_only", False)
-        if self.res_var.get() == "720" and default_res != "720":
-            self.res_var.set(default_res)
-        if not self.audio_only.get() and default_audio:
-            self.audio_only.set(True)
         try:
             info = self.downloader.get_info(url)
             title = info.get('title', 'Unknown')
@@ -562,8 +568,7 @@ class QueueTab:
         logger.info(f"Added to queue: {title[:50]}...")
         self.refresh_queue_display()
         self.url_var.set("")
-        self.res_var.set(self.app.settings.get("default_resolution", "720"))
-        self.audio_only.set(self.app.settings.get("default_audio_only", False))
+        self._apply_defaults_to_inputs()
         self.update_stats_display()
 
     # ------------------------------------------------------------
@@ -879,8 +884,11 @@ class QueueTab:
         if gen != self._run_gen or self._stop_event.is_set():
             return
 
+        mode = self.app.settings.get("download_mode", "parallel")
         parallel_limit = self.app.settings.get("parallel_limit", 2)
-        logger.info(f"Starting parallel downloads (max {parallel_limit})")
+        if mode == "sequential":
+            parallel_limit = 1
+        logger.info(f"Starting downloads (mode={mode}, max {parallel_limit})")
 
         # Mark all as downloading. Re-check the stop token inside the lock so a
         # stop that raced with us cannot leave items stuck in 'downloading'.
