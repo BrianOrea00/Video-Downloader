@@ -57,6 +57,10 @@ class ThemeManager:
         accent = c["accent"]
         muted = c.get("muted", ts)
 
+        # Set default font
+        if "CTkFont" in ctk.ThemeManager.theme:
+            ctk.ThemeManager.theme["CTkFont"]["family"] = "Monocraft"
+
         def _set(widget, key, value):
             if widget in ctk.ThemeManager.theme and key in ctk.ThemeManager.theme[widget]:
                 ctk.ThemeManager.theme[widget][key] = [value, value]

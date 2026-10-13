@@ -122,7 +122,7 @@ class QueueTab:
             url_frame,
             textvariable=self.url_var,
             placeholder_text="https://youtube.com/watch?v=...",
-            font=ctk.CTkFont(family="monospace", size=12),
+            font=ctk.CTkFont(family="Monocraft", size=12),
             fg_color=theme_manager.get_color("surface"),
             border_color=theme_manager.get_color("border"),
             text_color=theme_manager.get_color("text_primary"),
@@ -235,7 +235,7 @@ class QueueTab:
         self.path_label = ctk.CTkLabel(
             path_bg,
             text="Select download folder...",
-            font=ctk.CTkFont(family="monospace", size=11),
+            font=ctk.CTkFont(family="Monocraft", size=11),
             text_color=theme_manager.get_color("muted"),
             anchor="w"
         )
@@ -290,7 +290,7 @@ class QueueTab:
         self.percent_label = ctk.CTkLabel(
             stats_row,
             text="0%",
-            font=ctk.CTkFont(family="monospace", size=11),
+            font=ctk.CTkFont(family="Monocraft", size=11),
             text_color=theme_manager.get_color("greige")
         )
         self.percent_label.pack(side="right")
