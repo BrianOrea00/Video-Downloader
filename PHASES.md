@@ -291,14 +291,16 @@ Sub-steps (each lands a working app):
 1. Extract `models.py` + `queue_manager.py` + `persistence.py` from `queue_tab` logic;
    port the Phase-1-style tests to the pure-Python manager.
 2. PySide skeleton: main window, sidebar nav, dark QSS, stacked pages.
-3. Port Queue page (highest value): add-URL, resolution pills, per-row progress driven
-   by the existing hook data, stop/resume, storage bar, async `get_info`.
+3. Port Queue page (highest value): add-URL, link preview panel (see §4.4), resolution
+   pills, per-row progress driven by the existing hook data, stop/resume, storage bar,
+   async `get_info`.
 4. Port Videos/Music pages: Videos = thumbnail grid (word-wrapped QListView + delegate,
    real thumbs via `thumb_cache`, fallback icon when missing); Music = metadata list
    (QThread scan), play/delete.
 5. Port Settings page + cookies UI; cookie test `None` handling (see Phase 6).
 6. Light/dark QSS theme switch (replaces Phase 3).
-7. Remove README preview claim or implement real preview (see Phase 5).
+7. Implement the real link preview panel (§4.4) so the README claim holds; keep the
+   fetch off the UI thread. (Resolves the Phase 5 preview item.)
 8. Delete Tk modules: `ui.py`, `queue_tab.py`, `videos_tab.py`, `music_tab.py`,
    `settings_tab.py`, `theme_manager.py`, `icon_manager.py`. Update README and
    `requirements.txt` (`-customtkinter`, `+PySide6`).
@@ -384,6 +386,11 @@ toggle stays.
 
 - Always-visible "New download" bar: URL field, paste, add; resolution pills derived
   from `config.RESOLUTIONS` (fixes §2.2); Audio-Only pill.
+- Paste (or a valid URL) reveals a **link preview panel** below the field: thumbnail with
+  a duration badge, title, and meta chips (channel, duration, views, estimated size).
+  Fetch runs off the main thread (§1.6); `None` from `get_info` shows a "could not fetch"
+  state. Reuse the fetched info for the queue item so no second `get_info` runs (§2.8).
+  Reference: `docs/ui-prototype.html` `#preview`.
 - Active downloads pinned top, one row each: status dot, title, res chip, **real
   per-row progress bar** (hook data already computed, see §2.1), speed, ETA, size,
   folder / cancel / retry actions.

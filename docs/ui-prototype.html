@@ -168,6 +168,34 @@
     font-size: 11px; padding: 9px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
+  /* ---------- link preview ---------- */
+  .preview {
+    margin-top: 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); padding: 10px; display: flex; gap: 12px; align-items: center;
+  }
+  .preview[hidden] { display: none; }
+  .preview-thumb {
+    width: 96px; height: 54px; flex: 0 0 96px; border-radius: 6px;
+    background: radial-gradient(120% 120% at 50% 0%, var(--hover) 0%, var(--bg) 60%);
+    border: 1px solid var(--border); position: relative;
+    display: grid; place-items: center; color: var(--muted); font-size: 18px;
+  }
+  .preview-thumb .dur {
+    position: absolute; right: 4px; bottom: 4px;
+    background: var(--bg-dark); color: var(--text);
+    font-size: 9px; padding: 1px 4px; border-radius: 3px;
+  }
+  .preview-body { flex: 1; min-width: 0; }
+  .preview-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .preview-meta { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+  .preview-state { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+  .spinner {
+    width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* ---------- stats chips ---------- */
   .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .chip {
@@ -339,6 +367,8 @@
             <div class="path">📁 /home/arisu/Downloads</div>
             <button class="btn">Browse</button>
           </div>
+
+          <div class="preview" id="preview" hidden></div>
         </div>
 
         <div class="chip-row">
@@ -519,16 +549,57 @@
     renderQueue();
   }
 
+  /* ============ link preview ============ */
+  const urlInput = document.getElementById('url-input');
+  const preview = document.getElementById('preview');
+  const previewData = {
+    title: 'How GPS Actually Works (watch this first)',
+    channel: 'Veritasium',
+    duration: '23:41',
+    views: '4.2M views',
+    size: '~240 MB @ 720p'
+  };
+  let previewTimer = null;
+
+  function showPreview() {
+    const url = urlInput.value.trim();
+    if (!url) { hidePreview(); return; }
+    preview.hidden = false;
+    preview.innerHTML = '<div class="preview-state"><span class="spinner"></span>Fetching video info…</div>';
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      preview.innerHTML = `
+        <div class="preview-thumb">▶<span class="dur mono">${previewData.duration}</span></div>
+        <div class="preview-body">
+          <div class="preview-title">${previewData.title}</div>
+          <div class="preview-meta">
+            <span class="mini-chip sub">${previewData.channel}</span>
+            <span class="mini-chip info mono">${previewData.duration}</span>
+            <span class="mini-chip sub">${previewData.views}</span>
+            <span class="mini-chip">${previewData.size}</span>
+          </div>
+        </div>`;
+    }, 650);
+  }
+  function hidePreview() {
+    clearTimeout(previewTimer);
+    preview.hidden = true;
+    preview.innerHTML = '';
+  }
+  urlInput.addEventListener('input', showPreview);
+
   /* ============ fakes ============ */
   let nextId = 5;
   function fakePaste() {
-    document.getElementById('url-input').value = 'https://youtube.com/watch?v=dQw4w9WgXcQ';
+    urlInput.value = 'https://youtube.com/watch?v=dQw4w9WgXcQ';
+    showPreview();
   }
   function fakeAdd() {
-    const url = document.getElementById('url-input').value;
+    const url = urlInput.value;
     if (!url) return;
-    queue.push({ id: nextId++, title: 'Newly added video #' + nextId, res: '720p', status: 'pending', pct: 0 });
-    document.getElementById('url-input').value = '';
+    queue.push({ id: nextId++, title: previewData.title, res: '720p', status: 'pending', pct: 0 });
+    urlInput.value = '';
+    hidePreview();
     renderQueue();
   }
   function fakeStart() {
