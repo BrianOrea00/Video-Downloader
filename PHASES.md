@@ -447,7 +447,7 @@ for all text, including the numeric readouts.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | Queue state machine + cancel | Completed |
-| 2 | Settings honored | Not started |
+| 2 | Settings honored | Completed |
 | 3 | Theme correctness | Absorbed into Phase 8 |
 | 4 | Progress UI | Absorbed into Phase 8 |
 | 5 | Async + dedupe | Absorbed into Phase 8 |
