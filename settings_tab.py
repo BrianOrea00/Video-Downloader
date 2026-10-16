@@ -117,7 +117,7 @@ class SettingsTab:
         mode_radio_frame = ctk.CTkFrame(mode_frame, fg_color="transparent")
         mode_radio_frame.pack(side="right")
         
-        self.download_mode_var = ctk.StringVar(value="sequential")
+        self.download_mode_var = ctk.StringVar(value=DEFAULT_SETTINGS.get("download_mode", "parallel"))
         
         sequential_radio = ctk.CTkRadioButton(
             mode_radio_frame,
@@ -616,6 +616,12 @@ class SettingsTab:
                 downloader = Downloader()
                 info = downloader.get_info(test_url, cookie_settings)
                 
+                if not info:
+                    raise RuntimeError(
+                        "No video info returned — the extractor failed. Cookies are "
+                        "missing, expired, or not being applied."
+                    )
+                
                 # Success - got info
                 title = info.get('title', 'Unknown')
                 self.frame.after(0, lambda: self.cookie_test_status.configure(
@@ -646,7 +652,7 @@ class SettingsTab:
     def load_settings(self):
         settings = self.app.settings
         
-        mode = settings.get("download_mode", "sequential")
+        mode = settings.get("download_mode", "parallel")
         self.download_mode_var.set(mode)
         self.parallel_limit_var.set(settings.get("parallel_limit", 2))
         self.parallel_limit_value.configure(text=str(settings.get("parallel_limit", 2)))
@@ -709,7 +715,7 @@ class SettingsTab:
     
     def reset_defaults(self):
         if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings to default values?"):
-            self.download_mode_var.set(DEFAULT_SETTINGS.get("download_mode", "sequential"))
+            self.download_mode_var.set(DEFAULT_SETTINGS.get("download_mode", "parallel"))
             self.parallel_limit_var.set(DEFAULT_SETTINGS.get("parallel_limit", 2))
             self.parallel_limit_value.configure(text=str(DEFAULT_SETTINGS.get("parallel_limit", 2)))
             self.default_res_var.set(DEFAULT_SETTINGS.get("default_resolution", "720"))

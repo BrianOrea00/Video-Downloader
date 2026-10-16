@@ -50,7 +50,7 @@ class VideosTab:
         self.path_label = ctk.CTkLabel(
             path_frame,
             text="No download folder selected",
-            font=ctk.CTkFont(family="monospace", size=11),
+            font=ctk.CTkFont(family="Monocraft", size=11),
             text_color=theme_manager.get_color("muted")
         )
         self.path_label.pack(side="left")
