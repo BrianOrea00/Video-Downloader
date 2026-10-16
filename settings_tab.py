@@ -616,6 +616,12 @@ class SettingsTab:
                 downloader = Downloader()
                 info = downloader.get_info(test_url, cookie_settings)
                 
+                if not info:
+                    raise RuntimeError(
+                        "No video info returned — the extractor failed. Cookies are "
+                        "missing, expired, or not being applied."
+                    )
+                
                 # Success - got info
                 title = info.get('title', 'Unknown')
                 self.frame.after(0, lambda: self.cookie_test_status.configure(

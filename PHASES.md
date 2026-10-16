@@ -69,6 +69,9 @@ progress hook last reported as `filename` (the final output template), not the a
 **Fix:** decide the intended resume semantics, wire the real partial path to yt-dlp's
 `continue_dl`, or remove the dead tracking code.
 
+**Resolved (Phase 6):** the dead tracking code is deleted. yt-dlp's `continuedl` already
+resumes from the `<outtmpl>.part` file, so no app-side partial tracking is needed.
+
 ### 1.6 UI thread blocked on network I/O
 
 `add_to_queue` (`queue_tab.py:532`) calls `downloader.get_info(url)` synchronously on the
@@ -85,6 +88,9 @@ UI thread. Any slow extractor freezes the whole window for seconds.
 calls `info.get('title', ...)` on `None`, crashing or faking "Cookie test passed".
 
 **Fix:** treat `None` result as failure with a clear message.
+
+**Resolved (Phase 6):** `test_cookies` now raises on a `None`/falsy `get_info` result, so
+the failure path reports "Cookie Test Failed" instead of crashing on `None.get`.
 
 ---
 
@@ -235,14 +241,18 @@ mode.
 **Verify:** pasting/add/clipboard never freezes the UI even on slow sites; large music
 folders scan without blocking.
 
-### Phase 6 — Resume + cookie test (1.5, 1.7)
+### Phase 6 — Resume + cookie test (1.5, 1.7) — **Completed**
 
-- Define resume semantics; wire the actual partial path to yt-dlp `continue_dl` or
-  delete the dead tracking code.
-- Treat `None` `get_info` result as failure in the cookie test.
+- Resume: remove the dead partial-tracking code (`_find_partial_file`,
+  `_save_partial_tracking`, `_clear_partial_tracking`, the `_partial_file` field, and
+  their call sites). yt-dlp's `continuedl` already resumes from the `<outtmpl>.part`
+  file, so resume works without app-side bookkeeping. This also removes the extra
+  `queue.json` writer race noted in 2.8.
+- Cookie test: a `None` result from `get_info` now raises, so the cookie test reports a
+  clear failure instead of crashing on `None.get` or faking "Cookie test passed".
 
-**Verify:** interrupted download resumes from where it stopped; cookie test fails clearly
-when cookies are wrong.
+**Verify:** interrupted download resumes from where it stopped (yt-dlp default behavior);
+cookie test fails clearly when cookies are wrong.
 
 ### Phase 7 — Hardening (2.7, 2.8)
 
@@ -458,6 +468,6 @@ for all text, including the numeric readouts.
 | 3 | Theme correctness | Absorbed into Phase 8 |
 | 4 | Progress UI | Absorbed into Phase 8 |
 | 5 | Async + dedupe | Absorbed into Phase 8 |
-| 6 | Resume + cookie test | Not started |
+| 6 | Resume + cookie test | Completed |
 | 7 | Hardening | Not started |
 | 8 | PySide6 port (replaces 3/4/5 UI) | Not started |
