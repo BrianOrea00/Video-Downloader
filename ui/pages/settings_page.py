@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from config import RESOLUTIONS
+from ui.theme import METRICS, px
 from downloader import Downloader
 from persistence import save_settings
 
@@ -55,7 +56,7 @@ class CookieTestWorker(QThread):
 
 def _desc(text: str) -> QLabel:
     label = QLabel(text)
-    label.setStyleSheet("font-size: 11px;")
+    label.setObjectName("FormHelp")
     label.setWordWrap(True)
     return label
 
@@ -79,8 +80,8 @@ class SettingsPage(QWidget):
         container = QWidget()
         scroll.setWidget(container)
         col = QVBoxLayout(container)
-        col.setContentsMargins(24, 20, 24, 20)
-        col.setSpacing(16)
+        col.setContentsMargins(px(24), px(20), px(24), px(20))
+        col.setSpacing(px(16))
 
         col.addWidget(self._download_card())
         col.addWidget(self._general_card())
@@ -101,16 +102,16 @@ class SettingsPage(QWidget):
         card = QFrame()
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(px(16), px(16), px(16), px(16))
+        layout.setSpacing(px(10))
         title = QLabel(heading)
         title.setObjectName("FieldLabel")
         layout.addWidget(title)
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignLeft)
         form.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
-        form.setHorizontalSpacing(24)
-        form.setVerticalSpacing(12)
+        form.setHorizontalSpacing(px(24))
+        form.setVerticalSpacing(px(12))
         layout.addLayout(form)
         return card, form
 
@@ -140,7 +141,8 @@ class SettingsPage(QWidget):
             lambda: self._set("default_resolution", self.resolution.currentData()))
         form.addRow(self._label("Default resolution", "Applied to new queue items."), self.resolution)
 
-        self.audio_only = QCheckBox("Download audio (MP3) by default")
+        self.audio_only = QCheckBox("Enabled")
+        self.audio_only.setAccessibleName("Download audio (MP3) by default")
         self.audio_only.setChecked(bool(self.settings.get("default_audio_only", False)))
         self.audio_only.toggled.connect(lambda v: self._set("default_audio_only", v))
         form.addRow(self._label("Audio only", "Default format for new items."), self.audio_only)
@@ -149,7 +151,8 @@ class SettingsPage(QWidget):
     def _general_card(self) -> QFrame:
         card, form = self._card("GENERAL")
 
-        self.auto_clipboard = QCheckBox("Poll the clipboard for YouTube URLs")
+        self.auto_clipboard = QCheckBox("Enabled")
+        self.auto_clipboard.setAccessibleName("Poll the clipboard for YouTube URLs")
         self.auto_clipboard.setChecked(bool(self.settings.get("auto_clipboard", True)))
         self.auto_clipboard.toggled.connect(lambda v: self._set("auto_clipboard", v))
         form.addRow(self._label("Auto clipboard detection", "Paste automatically when a link is copied."),
@@ -213,10 +216,18 @@ class SettingsPage(QWidget):
         box = QWidget()
         layout = QVBoxLayout(box)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        layout.setSpacing(px(2))
         title = QLabel(name)
         layout.addWidget(title)
         layout.addWidget(_desc(description))
+        # QFormLayout sizes a row from the field widget by default. A plain QWidget
+        # does not advertise heightForWidth, so the wrapped description is ignored
+        # and its lines spill into the next row. Opt in explicitly, and give the
+        # label column a stable width so the text wraps instead of overflowing.
+        policy = box.sizePolicy()
+        policy.setHeightForWidth(True)
+        box.setSizePolicy(policy)
+        box.setMinimumWidth(px(METRICS["label_column"]))
         return box
 
     @staticmethod

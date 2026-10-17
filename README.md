@@ -39,6 +39,7 @@ A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`
 - Sidebar navigation with active-page indicator and a storage meter
 - Top bar with live item count badge and theme toggle
 - Dark and light themes with an arisu-pink (`#ff79c6`) accent — the single source of truth is `ui/theme.py`
+- Interface scale driven by one token: `ui_scale` in `settings.json` (`1.0` = design size, shipped default `1.5`).
 - VLC auto-detection; falls back to the system default player if VLC is not found
 
 ---

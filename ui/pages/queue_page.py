@@ -33,6 +33,7 @@ from queue_runner import QueueRunner
 from url_validator import validate_url
 import thumb_cache
 from ui import theme as ui_theme
+from ui.theme import METRICS, px
 
 logger = logging.getLogger(__name__)
 
@@ -146,29 +147,29 @@ class QueueRow(QFrame):
             self.setObjectName("RowActive")
 
         row = QHBoxLayout(self)
-        row.setContentsMargins(12, 10, 12, 10)
-        row.setSpacing(12)
+        row.setContentsMargins(px(12), px(10), px(12), px(10))
+        row.setSpacing(px(12))
 
         tile = QLabel("\u266a" if item.audio_only else "\u25bc")
         tile.setObjectName("RowTile")
-        tile.setFixedSize(40, 28)
+        tile.setFixedSize(px(METRICS["row_tile_w"]), px(METRICS["row_tile_h"]))
         tile.setAlignment(Qt.AlignCenter)
         row.addWidget(tile)
 
         main = QVBoxLayout()
-        main.setSpacing(3)
+        main.setSpacing(px(3))
         self.title_label = QLabel(item.title[:80])
         if item.status is DownloadStatus.COMPLETED:
             self.title_label.setStyleSheet(f"color: {ui_theme.color('muted')};")
         main.addWidget(self.title_label)
 
         meta = QHBoxLayout()
-        meta.setSpacing(6)
+        meta.setSpacing(px(6))
         res_text = "MP3" if item.audio_only else f"{item.resolution}p"
         meta.addWidget(_chip(res_text))
         label, token = STATUS_META.get(item.status, STATUS_META[DownloadStatus.PENDING])
         status = QLabel(f"\u25cf {label}")
-        status.setStyleSheet(f"color: {ui_theme.color(token)}; font-size: 10px;")
+        status.setStyleSheet(f"color: {ui_theme.color(token)}; font-size: {ui_theme.px(10)}px;")
         meta.addWidget(status)
         meta.addStretch(1)
         main.addLayout(meta)
@@ -177,19 +178,19 @@ class QueueRow(QFrame):
         self.progress.setObjectName("RowProgress")
         self.progress.setRange(0, 100)
         self.progress.setTextVisible(False)
-        self.progress.setFixedHeight(4)
+        self.progress.setFixedHeight(px(METRICS["row_progress"]))
         self.progress.setVisible(item.status is DownloadStatus.DOWNLOADING)
         main.addWidget(self.progress)
 
         self.stats = QLabel("")
-        self.stats.setStyleSheet(f"color: {ui_theme.color('gray_light')}; font-size: 11px;")
+        self.stats.setStyleSheet(f"color: {ui_theme.color('gray_light')}; font-size: {ui_theme.px(11)}px;")
         self.stats.setVisible(item.status is DownloadStatus.DOWNLOADING)
         main.addWidget(self.stats)
 
         row.addLayout(main, 1)
 
         actions = QHBoxLayout()
-        actions.setSpacing(6)
+        actions.setSpacing(px(6))
         actions.addWidget(self._icon_button("\U0001f4c1", "Open folder", lambda: self.open_folder.emit(self.item)))
         if item.status is DownloadStatus.DOWNLOADING:
             actions.addWidget(self._icon_button("\u2715", "Cancel", lambda: self.cancel.emit(self.item)))
@@ -201,7 +202,7 @@ class QueueRow(QFrame):
 
     def _icon_button(self, glyph: str, tip: str, slot) -> QPushButton:
         button = QPushButton(glyph)
-        button.setFixedSize(28, 28)
+        button.setFixedSize(px(METRICS["row_action"]), px(METRICS["row_action"]))
         button.setToolTip(tip)
         button.setAccessibleName(tip)
         button.setCursor(Qt.PointingHandCursor)
@@ -259,23 +260,23 @@ class QueuePage(QWidget):
         container = QWidget()
         scroll.setWidget(container)
         col = QVBoxLayout(container)
-        col.setContentsMargins(24, 20, 24, 20)
-        col.setSpacing(16)
+        col.setContentsMargins(px(24), px(20), px(24), px(20))
+        col.setSpacing(px(16))
 
         col.addWidget(self._build_input_card())
 
         self.chips_row = QHBoxLayout()
-        self.chips_row.setSpacing(8)
+        self.chips_row.setSpacing(px(8))
         col.addLayout(self.chips_row)
 
         col.addWidget(self._section("Active"))
         self.active_list = QVBoxLayout()
-        self.active_list.setSpacing(8)
+        self.active_list.setSpacing(px(8))
         col.addLayout(self.active_list)
 
         col.addWidget(self._section("Queue"))
         self.queue_list = QVBoxLayout()
-        self.queue_list.setSpacing(8)
+        self.queue_list.setSpacing(px(8))
         col.addLayout(self.queue_list)
 
         col.addLayout(self._build_actions())
@@ -290,15 +291,15 @@ class QueuePage(QWidget):
         card = QFrame()
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(12)
+        layout.setContentsMargins(px(14), px(14), px(14), px(14))
+        layout.setSpacing(px(12))
 
         field = QLabel("ADD URL")
         field.setObjectName("FieldLabel")
         layout.addWidget(field)
 
         input_row = QHBoxLayout()
-        input_row.setSpacing(8)
+        input_row.setSpacing(px(8))
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("https://youtube.com/watch?v=...")
         self.url_input.setClearButtonEnabled(True)
@@ -316,7 +317,7 @@ class QueuePage(QWidget):
         layout.addLayout(input_row)
 
         pills = QHBoxLayout()
-        pills.setSpacing(6)
+        pills.setSpacing(px(6))
         self._res_group = QButtonGroup(self)
         self._res_group.setExclusive(True)
         self._res = self.settings.get("default_resolution", "720")
@@ -343,9 +344,9 @@ class QueuePage(QWidget):
         layout.addLayout(pills)
 
         path_row = QHBoxLayout()
-        path_row.setSpacing(8)
+        path_row.setSpacing(px(8))
         self.path_label = QLabel(self.settings.get("download_path") or "Select download folder\u2026")
-        self.path_label.setStyleSheet(f"color: {ui_theme.color('muted')}; font-size: 11px;")
+        self.path_label.setStyleSheet(f"color: {ui_theme.color('muted')}; font-size: {ui_theme.px(11)}px;")
         self.path_label.setWordWrap(False)
         path_row.addWidget(self.path_label, 1)
         browse = QPushButton("Browse")
@@ -357,14 +358,14 @@ class QueuePage(QWidget):
         self.preview.setObjectName("Card")
         self.preview.setVisible(False)
         self.preview_layout = QHBoxLayout(self.preview)
-        self.preview_layout.setContentsMargins(10, 10, 10, 10)
-        self.preview_layout.setSpacing(12)
+        self.preview_layout.setContentsMargins(px(10), px(10), px(10), px(10))
+        self.preview_layout.setSpacing(px(12))
         layout.addWidget(self.preview)
         return card
 
     def _build_actions(self) -> QHBoxLayout:
         actions = QHBoxLayout()
-        actions.setSpacing(8)
+        actions.setSpacing(px(8))
         self.start_btn = QPushButton("Start Queue")
         self.start_btn.setObjectName("PrimaryButton")
         self.start_btn.clicked.connect(self.start)
@@ -426,7 +427,7 @@ class QueuePage(QWidget):
         if folder:
             self.settings["download_path"] = folder
             self.path_label.setText(folder)
-            self.path_label.setStyleSheet(f"color: {ui_theme.color('text')}; font-size: 11px;")
+            self.path_label.setStyleSheet(f"color: {ui_theme.color('text')}; font-size: {ui_theme.px(11)}px;")
 
     # -- link preview ------------------------------------------------------
     def _fetch_preview(self, url: str) -> None:
@@ -476,17 +477,17 @@ class QueuePage(QWidget):
 
         thumb = QLabel("\u25b6")
         thumb.setObjectName("RowTile")
-        thumb.setFixedSize(96, 54)
+        thumb.setFixedSize(px(METRICS["row_thumb_w"]), px(METRICS["row_thumb_h"]))
         thumb.setAlignment(Qt.AlignCenter)
         self.preview_layout.addWidget(thumb)
 
         body = QVBoxLayout()
-        body.setSpacing(4)
+        body.setSpacing(px(4))
         title = QLabel(info.get("title", "Unknown"))
         title.setStyleSheet("font-weight: 600;")
         body.addWidget(title)
         chips = QHBoxLayout()
-        chips.setSpacing(6)
+        chips.setSpacing(px(6))
         channel = info.get("uploader") or info.get("channel")
         if channel:
             chips.addWidget(_chip(channel))

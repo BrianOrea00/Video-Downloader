@@ -15,7 +15,8 @@ DEFAULT_SETTINGS = {
     "download_path": "",
     "cookie_method": "none",  # Options: "none", "browser", "file"
     "cookie_browser": "chrome",  # Options: "chrome", "firefox", "edge", "brave", "opera", "safari"
-    "cookie_file_path": ""  # Path to cookies.txt file
+    "cookie_file_path": "",  # Path to cookies.txt file
+    "ui_scale": 1.5  # UI scale: 1.0 = original design size, 1.5 = 50% larger
 }
 
 # These are now just for reference - CustomTkinter custom theme handles colors

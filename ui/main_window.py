@@ -22,7 +22,7 @@ from ui.pages.queue_page import QueuePage
 from ui.pages.settings_page import SettingsPage
 from ui.pages.videos_page import VideosPage
 from ui.sidebar import Sidebar
-from ui.theme import apply_theme
+from ui.theme import METRICS, apply_theme, px
 
 TITLES = {
     "queue": "Download Queue",
@@ -39,8 +39,16 @@ class MainWindow(QMainWindow):
         self.theme = settings.get("theme", "dark")
 
         self.setWindowTitle("Video Downloader")
-        self.resize(1200, 700)
-        self.setMinimumSize(900, 600)
+        # Scale the window with the UI, but never demand more than the screen has.
+        min_w = px(METRICS["min_window_w"])
+        min_h = px(METRICS["min_window_h"])
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            min_w = min(min_w, max(320, int(available.width() * 0.9)))
+            min_h = min(min_h, max(240, int(available.height() * 0.9)))
+        self.setMinimumSize(min_w, min_h)
+        self.resize(max(min_w, px(1200)), max(min_h, px(700)))
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -85,10 +93,10 @@ class MainWindow(QMainWindow):
     def _build_topbar(self) -> QWidget:
         bar = QWidget()
         bar.setObjectName("TopBar")
-        bar.setFixedHeight(56)
+        bar.setFixedHeight(px(METRICS["topbar_height"]))
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(20, 0, 20, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(px(20), 0, px(20), 0)
+        layout.setSpacing(px(12))
 
         self.title_label = QLabel(TITLES["queue"])
         self.title_label.setObjectName("PageTitle")

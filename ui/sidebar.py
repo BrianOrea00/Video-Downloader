@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from ui.theme import METRICS, px
+
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -38,12 +40,12 @@ class Sidebar(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        self.setFixedWidth(240)
+        self.setFixedWidth(px(METRICS["sidebar_width"]))
         self._buttons: dict[str, QPushButton] = {}
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 16, 12, 12)
-        root.setSpacing(2)
+        root.setContentsMargins(px(12), px(16), px(12), px(12))
+        root.setSpacing(px(2))
 
         root.addWidget(self._build_logo())
         root.addWidget(_section_label("Library"))
@@ -63,16 +65,16 @@ class Sidebar(QWidget):
     def _build_logo(self) -> QWidget:
         row = QWidget()
         layout = QHBoxLayout(row)
-        layout.setContentsMargins(4, 0, 4, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(px(4), 0, px(4), px(12))
+        layout.setSpacing(px(8))
 
         mark = QLabel("\u25bc")
         mark.setObjectName("LogoMark")
-        mark.setFixedSize(22, 22)
+        mark.setFixedSize(px(METRICS["logo_mark"]), px(METRICS["logo_mark"]))
         mark.setAlignment(Qt.AlignCenter)
 
         text = QVBoxLayout()
-        text.setSpacing(0)
+        text.setSpacing(px(0))
         title = QLabel("Downloader")
         title.setObjectName("LogoTitle")
         subtitle = QLabel("yt-dlp")
@@ -99,8 +101,8 @@ class Sidebar(QWidget):
     def _build_storage(self) -> QWidget:
         box = QWidget()
         layout = QVBoxLayout(box)
-        layout.setContentsMargins(4, 12, 4, 0)
-        layout.setSpacing(6)
+        layout.setContentsMargins(px(4), px(12), px(4), 0)
+        layout.setSpacing(px(6))
 
         head = QWidget()
         head_layout = QHBoxLayout(head)
@@ -115,12 +117,12 @@ class Sidebar(QWidget):
 
         self._track = QFrame()
         self._track.setObjectName("Track")
-        self._track.setFixedHeight(3)
+        self._track.setFixedHeight(px(METRICS["shelf"]))
         track_layout = QHBoxLayout(self._track)
         track_layout.setContentsMargins(0, 0, 0, 0)
         self._fill = QFrame()
         self._fill.setObjectName("TrackFill")
-        self._fill.setFixedHeight(3)
+        self._fill.setFixedHeight(px(METRICS["shelf"]))
         self._fill.setFixedWidth(0)
         track_layout.addWidget(self._fill)
         track_layout.addStretch(1)

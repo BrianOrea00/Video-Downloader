@@ -16,6 +16,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize, QThread, Signal
 from PySide6.QtGui import QIcon, QPixmap
+from ui.theme import METRICS, px
+
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -135,22 +137,22 @@ class MediaBrowser(QWidget):
     # -- construction ------------------------------------------------------
     def _build(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 20, 24, 20)
-        outer.setSpacing(12)
+        outer.setContentsMargins(px(24), px(20), px(24), px(20))
+        outer.setSpacing(px(12))
 
         header = QFrame()
         header.setObjectName("Card")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(14, 12, 14, 12)
-        header_layout.setSpacing(8)
+        header_layout.setContentsMargins(px(14), px(12), px(14), px(12))
+        header_layout.setSpacing(px(8))
 
         self.path_label = QLabel("No download folder selected")
-        self.path_label.setStyleSheet("font-size: 11px;")
+        self.path_label.setObjectName("FormHelp")
         header_layout.addWidget(self.path_label, 1)
 
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search\u2026")
-        self.search.setFixedWidth(220)
+        self.search.setFixedWidth(px(METRICS["search_width"]))
         self.search.textChanged.connect(self._apply_filter)
         header_layout.addWidget(self.search)
 
@@ -162,12 +164,14 @@ class MediaBrowser(QWidget):
         outer.addWidget(header)
 
         self.list = QListWidget()
-        self.list.setIconSize(QSize(160, 90))
+        self.list.setIconSize(
+            QSize(px(METRICS["grid_icon_w"]), px(METRICS["grid_icon_h"])))
         if self.icon_mode:
             self.list.setViewMode(QListWidget.IconMode)
             self.list.setResizeMode(QListWidget.Adjust)
             self.list.setMovement(QListWidget.Static)
-            self.list.setGridSize(QSize(200, 150))
+            self.list.setGridSize(
+                QSize(px(METRICS["grid_cell_w"]), px(METRICS["grid_cell_h"])))
             self.list.setWordWrap(True)
         self.list.itemDoubleClicked.connect(self._play_item)
         self.list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -197,8 +201,9 @@ class MediaBrowser(QWidget):
         if folder != (self.settings.get("download_path") or ""):
             return
         self._entries = entries
-        self._render()
-        self.status.setText(f"Found {len(entries)} file(s)")
+        self._render()  # sets the empty-state hint in the status line when bare
+        if entries:
+            self.status.setText(f"Found {len(entries)} file(s)")
 
     # -- rendering ---------------------------------------------------------
     def _apply_filter(self, _text: str) -> None:
@@ -215,9 +220,10 @@ class MediaBrowser(QWidget):
             self.list.addItem(self._make_item(entry))
             shown += 1
         if shown == 0:
-            placeholder = QListWidgetItem(f"{self.empty_title} \u2014 {self.empty_hint}")
+            placeholder = QListWidgetItem(self.empty_title)
             placeholder.setFlags(Qt.NoItemFlags)
             self.list.addItem(placeholder)
+            self.status.setText(self.empty_hint)
 
     def _make_item(self, entry: dict) -> QListWidgetItem:
         if self.kind == "music":
