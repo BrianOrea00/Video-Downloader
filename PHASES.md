@@ -3,11 +3,12 @@
 Audit of the full codebase (branch `InProgress`, Sep 2026). This document lists every
 problem found, grouped by severity, and the phased plan to fix them.
 
-App: desktop downloader wrapping `yt-dlp`. Initially CustomTkinter; see Phase 8 — the
-UI is being ported incrementally to PySide6 (Qt). Legacy modules: `main.py`, `ui.py`,
-`queue_tab.py`, `videos_tab.py`, `music_tab.py`, `settings_tab.py`, `downloader.py`,
-`theme_manager.py`, `icon_manager.py`, `url_validator.py`, `utils.py`, `config.py`,
-`logger.py`.
+App: desktop downloader wrapping `yt-dlp`. The UI is PySide6 (Qt) — the port from
+CustomTkinter landed in Phase 8. The Tk modules (`main.py` `ui.py` `queue_tab.py`
+`videos_tab.py` `music_tab.py` `settings_tab.py` `theme_manager.py` `icon_manager.py`)
+are deleted. The current tree is `models.py`, `queue_manager.py`, `queue_runner.py`,
+`persistence.py`, `thumb_cache.py`, `downloader.py`, `url_validator.py`, `utils.py`,
+`config.py`, `logger.py`, and the `ui/` package.
 
 ---
 
@@ -267,32 +268,34 @@ cookie test fails clearly when cookies are wrong.
 
 > Note: icon caching is Tk-specific — skip it; Qt assets are handled in Phase 8.
 
-### Phase 8 — PySide6 incremental port (UI rewrite)
+### Phase 8 — PySide6 incremental port (UI rewrite) — **Completed**
 
 Decision: port the UI from CustomTkinter to PySide6 (Qt) as a **Download Console** —
 see §4 for the approved UI reference. QSS styling, virtualized lists, real per-row
 progress, signal-based threading. The "Spotify-grade look" goal is dropped: the app is
 a video downloader, not a music player. Engine, persistence, and queue state machine
-survive; only the Tk UI layer dies. Port lands incrementally so the app keeps working
-through the transition.
+survive; only the Tk UI layer dies. The port landed incrementally so the app kept
+working through the transition. All eight sub-steps are done; the Tk modules are
+deleted.
 
 Target layout:
 
 ```text
 models.py              # DownloadItem dataclass + DownloadStatus enum
 queue_manager.py       # queue state machine (pure Python, extracted from queue_tab)
+queue_runner.py        # threaded download executor emitting Qt signals
 persistence.py         # thread-safe JSON (queue/history/settings), single write lock
 thumb_cache.py         # fetch/store/serve yt-dlp thumbnails (from info['thumbnail'])
-services/downloader.py # yt-dlp wrapper (survives), callbacks -> Qt signals at edge
+downloader.py          # yt-dlp wrapper (survives), callbacks -> Qt signals at edge
 ui/
   main_window.py       # shell + QStackedWidget
   sidebar.py
   theme.py             # QSS dark/light — arisu-pink palette (see §4)
   pages/queue_page.py  # Download Console: pinned active rows + input bar
+  pages/media_page.py  # shared media-browser base
   pages/videos_page.py # thumbnail grid (QListView icon-mode + delegate)
   pages/music_page.py  # metadata list (QThread scan)
   pages/settings_page.py
-  widgets/queue_row.py # QWidget rows + real per-row progress bars
 main.py                # PySide6 entry
 ```
 
@@ -469,5 +472,5 @@ for all text, including the numeric readouts.
 | 4 | Progress UI | Absorbed into Phase 8 |
 | 5 | Async + dedupe | Absorbed into Phase 8 |
 | 6 | Resume + cookie test | Completed |
-| 7 | Hardening | Partial — `pyproject.toml` (ruff) + tests added, thread-safe `persistence.py` done; Tk-only items pending |
-| 8 | PySide6 port (replaces 3/4/5 UI) | In progress — sub-steps 1-5 + 6/7 done; sub-step 8 (delete Tk modules) pending |
+| 7 | Hardening | Completed (Python items) — `pyproject.toml` (ruff) + tests added, thread-safe `persistence.py`, `where` fallback, host-match hardening, explicit `except` handling. The Tk-only items (icon caching, theme flash) are moot — see Phase 8. |
+| 8 | PySide6 port (replaces 3/4/5 UI) | Completed — sub-steps 1-8 done; Tk modules deleted, `requirements.txt` is PySide6-only, README rewritten |
