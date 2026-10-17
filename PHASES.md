@@ -469,5 +469,5 @@ for all text, including the numeric readouts.
 | 4 | Progress UI | Absorbed into Phase 8 |
 | 5 | Async + dedupe | Absorbed into Phase 8 |
 | 6 | Resume + cookie test | Completed |
-| 7 | Hardening | Not started |
-| 8 | PySide6 port (replaces 3/4/5 UI) | Not started |
+| 7 | Hardening | Partial — `pyproject.toml` (ruff) + tests added, thread-safe `persistence.py` done; Tk-only items pending |
+| 8 | PySide6 port (replaces 3/4/5 UI) | In progress — sub-steps 1-5 + 6/7 done; sub-step 8 (delete Tk modules) pending |

@@ -62,7 +62,7 @@ class Downloader:
 
     def download(self, url, path, resolution, progress_callback, done_callback,
                  audio_only=False, cookie_settings=None, max_retries=3, backoff_factor=2,
-                 stop_event=None):
+                 stop_event=None, info_callback=None):
         def stopped():
             return stop_event is not None and stop_event.is_set()
 
@@ -170,11 +170,16 @@ class Downloader:
                 try:
                     logger.info(f"Starting download: {url}")
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
+                        info = ydl.extract_info(url, download=True)
                     if self.cancelled or stopped():
                         logger.info(f"Download stopped: {url}")
                         done_callback("Download stopped")
                         return
+                    if info_callback and info:
+                        try:
+                            info_callback(info)
+                        except Exception as cb_err:
+                            logger.error(f"info_callback failed: {cb_err}")
                     logger.info(f"Download completed: {url}")
                     done_callback("Download completed successfully!")
                     return

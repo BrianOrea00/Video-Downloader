@@ -1,19 +1,30 @@
 # main.py
-import customtkinter as ctk
-from ui import App
-from theme_manager import theme_manager
+"""PySide6 entry point (Phase 8 port)."""
+import sys
+
+from PySide6.QtWidgets import QApplication
+
 from logger import logger
+from persistence import load_settings
+from ui.main_window import MainWindow
+from ui.theme import apply_theme
 
-# Set default appearance mode to dark (your primary palette)
-ctk.set_appearance_mode("dark")
 
-# Apply your custom theme
-theme_manager.apply_custom_theme()
+def main() -> int:
+    logger.info("Starting Video Downloader")
+    app = QApplication(sys.argv)
+    app.setApplicationName("Video Downloader")
 
-logger.info("Starting Video Downloader")
+    settings = load_settings()
+    apply_theme(app, settings.get("theme", "dark"))
 
-root = ctk.CTk()
-app = App(root)
-root.mainloop()
+    window = MainWindow(settings)
+    window.show()
 
-logger.info("Application closed")
+    code = app.exec()
+    logger.info("Application closed")
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
