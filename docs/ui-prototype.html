@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Downloader — UI Prototype (arisu-pink)</title>
+<style>
+  /* ============================================================
+     Download Console prototype — arisu-pink / PHASES.md §4
+     Static mockup. Palette tokens come straight from the tables.
+     Typography: Monocraft (see PHASES.md §4.7).
+     ============================================================ */
+  :root {
+    --bg:            #0a0710;
+    --bg-dark:       #05030a;
+    --sidebar:       #08050e;
+    --topbar:        #0c0814;
+    --card:          #0f0b17;
+    --popup:         #130e1c;
+    --hover:         #1f192b;
+    --border:        #2a1f3a;
+    --text:          #f8f2ff;
+    --text-2:        #c9c3d4;
+    --muted:         #6b5b7e;
+    --gray-light:    #8a7f9a;
+    --accent:        #ff79c6;
+    --pink-dim:      #e35aa5;
+    --info:          #bd93f9;
+    --success:       #50fa7b;
+    --error:         #ff5555;
+    --warning:       #ffb86c;
+    --paused:        #f1fa8c;
+    --track:         #3d3448;
+  }
+  [data-theme="light"] {
+    --bg:            #fdfaff;
+    --bg-dark:       #f7f2fb;
+    --sidebar:       #f2ecfa;
+    --topbar:        #fdfaff;
+    --card:          #ffffff;
+    --popup:         #ffffff;
+    --hover:         #ece4f5;
+    --border:        #d9cfe6;
+    --text:          #2a1e33;
+    --text-2:        #6b5b7e;
+    --muted:         #8a7f9a;
+    --gray-light:    #6b5b7e;
+    --accent:        #c1549c;
+    --pink-dim:      #a83e80;
+    --info:          #7a5bbf;
+    --success:       #3ec96a;
+    --error:         #e34c4c;
+    --warning:       #e8833c;
+    --paused:        #c9a227;
+    --track:         #d9cfe6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Monocraft", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono {
+    font-family: "Monocraft", ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- shell ---------- */
+  .shell { display: flex; height: 100vh; }
+  .sidebar {
+    width: 240px; flex: 0 0 240px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 16px 12px 12px;
+  }
+  .logo { display: flex; align-items: center; gap: 8px; padding: 0 4px 12px; }
+  .logo-mark {
+    width: 22px; height: 22px; border-radius: 5px;
+    background: var(--accent); display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; color: var(--bg-dark);
+  }
+  .logo-title { font-size: 13px; font-weight: 700; line-height: 1.1; }
+  .logo-sub { font-size: 10px; color: var(--muted); }
+  .section-label {
+    font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); padding: 12px 8px 4px;
+  }
+  .nav-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 8px 10px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--text); font-size: 12px;
+    cursor: pointer; text-align: left; margin-bottom: 2px;
+  }
+  .nav-btn:hover { background: var(--hover); }
+  .nav-btn.active { background: var(--accent); color: var(--bg-dark); font-weight: 600; }
+  .nav-btn .ic { width: 16px; text-align: center; font-size: 13px; }
+  .sidebar-spacer { flex: 1; }
+  .storage { padding: 0 4px; }
+  .storage-head { display: flex; justify-content: space-between; font-size: 10px; color: var(--gray-light); margin-bottom: 6px; }
+  .track { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; }
+  .track-fill { height: 100%; width: 34%; background: var(--accent); border-radius: 2px; }
+
+  /* ---------- main ---------- */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+  .topbar {
+    height: 56px; flex: 0 0 56px;
+    background: var(--topbar);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 20px;
+  }
+  .topbar h1 { font-size: 15px; font-weight: 700; flex: 1; }
+  .badge {
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 8px; font-size: 11px; color: var(--accent);
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text);
+    font-size: 12px; padding: 7px 14px; cursor: pointer;
+  }
+  .btn:hover { background: var(--hover); }
+  .btn.primary { background: var(--accent); color: var(--bg-dark); border-color: transparent; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger { color: var(--error); border-color: var(--error); background: transparent; }
+  .btn.sm { padding: 5px 10px; font-size: 11px; }
+
+  .content { flex: 1; overflow: auto; padding: 20px; }
+  .page { display: none; max-width: 960px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin-bottom: 16px;
+  }
+  .field-label {
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px;
+  }
+  .input-row { display: flex; gap: 8px; }
+  .input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text);
+    font-family: "Monocraft", ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    padding: 9px 12px; outline: none;
+  }
+  .input:focus { border-color: var(--accent); }
+  .input::placeholder { color: var(--muted); }
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+  .pill {
+    border: 1px solid var(--border); border-radius: 14px;
+    background: var(--bg); color: var(--gray-light);
+    font-size: 12px; padding: 5px 14px; cursor: pointer;
+  }
+  .pill:hover { background: var(--hover); }
+  .pill.active { border-color: var(--accent); color: var(--accent); background: var(--hover); }
+  .path-row { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .path{
+    flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); font-family: "Monocraft", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 11px; padding: 9px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ---------- link preview ---------- */
+  .preview {
+    margin-top: 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); padding: 10px; display: flex; gap: 12px; align-items: center;
+  }
+  .preview[hidden] { display: none; }
+  .preview-thumb {
+    width: 96px; height: 54px; flex: 0 0 96px; border-radius: 6px;
+    background: radial-gradient(120% 120% at 50% 0%, var(--hover) 0%, var(--bg) 60%);
+    border: 1px solid var(--border); position: relative;
+    display: grid; place-items: center; color: var(--muted); font-size: 18px;
+  }
+  .preview-thumb .dur {
+    position: absolute; right: 4px; bottom: 4px;
+    background: var(--bg-dark); color: var(--text);
+    font-size: 9px; padding: 1px 4px; border-radius: 3px;
+  }
+  .preview-body { flex: 1; min-width: 0; }
+  .preview-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .preview-meta { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+  .preview-state { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+  .spinner {
+    width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- stats chips ---------- */
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip {
+    background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+    font-size: 11px; color: var(--gray-light); padding: 4px 10px;
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  /* ---------- list rows ---------- */
+  .row {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .row.active-row { border-color: var(--accent); }
+  .tile {
+    width: 40px; height: 28px; flex: 0 0 40px; border-radius: 4px;
+    background: var(--bg); display: grid; place-items: center; font-size: 13px;
+    color: var(--gray-light);
+  }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-title.dim { color: var(--muted); font-weight: 400; }
+  .row-meta { display: flex; gap: 6px; margin-top: 3px; align-items: center; }
+  .mini-chip {
+    border: 1px solid var(--border); border-radius: 4px; background: var(--bg);
+    font-size: 10px; color: var(--accent); padding: 1px 6px;
+  }
+  .mini-chip.info { color: var(--info); }
+  .mini-chip.sub { color: var(--gray-light); }
+  .status { font-size: 10px; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .st-pending  { color: var(--muted); }
+  .st-download { color: var(--accent); }
+  .st-done    { color: var(--success); }
+  .st-failed  { color: var(--error); }
+  .st-paused  { color: var(--warning); }
+  .dot-pending  { background: var(--muted); }
+  .dot-download { background: var(--accent); }
+  .dot-done     { background: var(--success); }
+  .dot-failed   { background: var(--error); }
+  .dot-paused   { background: var(--warning); }
+  .row-progress {
+    height: 4px; border-radius: 2px; background: var(--border);
+    overflow: hidden; margin-top: 6px;
+  }
+  .row-progress > span {
+    display: block; height: 100%; background: var(--accent); border-radius: 2px;
+    transition: width .12s linear;
+  }
+  .row-stats { display: flex; gap: 10px; font-size: 11px; color: var(--gray-light); margin-top: 4px; }
+  .row-stats .speed { color: var(--info); }
+  .row-actions { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--gray-light); font-size: 13px; cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .icon-btn:hover { background: var(--hover); }
+  .icon-btn.play { background: var(--accent); border-color: transparent; color: var(--bg-dark); }
+  .icon-btn.play:hover { filter: brightness(1.08); }
+  .icon-btn.delete { border-color: var(--error); color: var(--error); }
+  .icon-btn.delete:hover { background: var(--card); }
+
+  .section-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+
+  .action-row { display: flex; gap: 8px; }
+
+  /* ---------- videos grid ---------- */
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .vcard { border-radius: 8px; border: 1px solid var(--border); background: var(--card); overflow: hidden; }
+  .vthumb {
+    aspect-ratio: 16/9; background:
+      radial-gradient(120% 120% at 50% 0%, var(--hover) 0%, var(--bg) 60%);
+    display: grid; place-items: center; color: var(--muted); font-size: 22px;
+    position: relative;
+  }
+  .vthumb .dur {
+    position: absolute; right: 6px; bottom: 6px;
+    background: var(--bg-dark); color: var(--text);
+    font-size: 10px; padding: 1px 5px; border-radius: 3px;
+  }
+  .vbody { padding: 8px 10px 10px; }
+  .vtitle { font-size: 12px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vmeta { font-size: 10px; color: var(--muted); margin-top: 4px; display: flex; justify-content: space-between; gap: 8px; }
+  .vmeta .mono { color: var(--info); }
+
+  /* ---------- settings ---------- */
+  .set-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .set-row:last-child { border-bottom: 0; }
+  .set-name { font-size: 13px; }
+  .set-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: var(--border); cursor: pointer; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--text); transition: left .12s ease, background .12s ease; }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { left: 18px; background: var(--bg-dark); }
+
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--gray-light); padding: 7px 14px; font-size: 12px; cursor: pointer; }
+  .seg button.active { background: var(--accent); color: var(--bg-dark); font-weight: 600; }
+
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">▼</div>
+      <div>
+        <div class="logo-title">Downloader</div>
+        <div class="logo-sub mono">yt-dlp</div>
+      </div>
+    </div>
+
+    <div class="section-label">Library</div>
+    <button class="nav-btn active" data-page="queue"><span class="ic">⬇</span> Queue</button>
+    <button class="nav-btn" data-page="videos"><span class="ic">▶</span> Videos</button>
+    <button class="nav-btn" data-page="music"><span class="ic">♪</span> Music</button>
+
+    <div class="section-label">System</div>
+    <button class="nav-btn" data-page="settings"><span class="ic">⚙</span> Settings</button>
+
+    <div class="sidebar-spacer"></div>
+    <div class="storage">
+      <div class="storage-head"><span>Storage</span><span class="mono">1.2 GB</span></div>
+      <div class="track"><div class="track-fill"></div></div>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <header class="topbar">
+      <h1 id="page-title">Download Queue</h1>
+      <div class="badge mono" id="count-badge">3 items</div>
+      <button class="btn sm" id="theme-toggle">☾ Light</button>
+    </header>
+
+    <div class="content">
+
+      <!-- ============ QUEUE ============ -->
+      <section class="page active" id="page-queue">
+        <div class="card">
+          <div class="field-label">Add URL</div>
+          <div class="input-row">
+            <input class="input" id="url-input" placeholder="https://youtube.com/watch?v=..." spellcheck="false">
+            <button class="btn" onclick="fakePaste()">Paste</button>
+            <button class="btn primary" onclick="fakeAdd()">Add to Queue</button>
+          </div>
+          <div class="pill-row">
+            <button class="pill active" data-res="144">144p</button>
+            <button class="pill" data-res="240">240p</button>
+            <button class="pill" data-res="360">360p</button>
+            <button class="pill" data-res="480">480p</button>
+            <button class="pill" data-res="720">720p</button>
+            <button class="pill" data-res="1080">1080p</button>
+            <span style="flex:1"></span>
+            <button class="pill" id="audio-pill">Audio Only</button>
+          </div>
+          <div class="path-row">
+            <div class="path">📁 /home/arisu/Downloads</div>
+            <button class="btn">Browse</button>
+          </div>
+
+          <div class="preview" id="preview" hidden></div>
+        </div>
+
+        <div class="chip-row">
+          <div class="chip">Total: <b id="stat-total">4</b></div>
+          <div class="chip">Pending: <b>2</b></div>
+          <div class="chip">Active: <b id="stat-active">1</b></div>
+          <div class="chip">Done: <b>1</b></div>
+        </div>
+
+        <div class="section-title">Active</div>
+        <div id="active-list"></div>
+
+        <div class="section-title">Queue</div>
+        <div id="queue-list"></div>
+
+        <div class="action-row" style="margin-top: 14px;">
+          <button class="btn primary" onclick="fakeStart()">Start Queue</button>
+          <button class="btn danger" onclick="fakeStop()">Stop</button>
+          <button class="btn">Clear Completed</button>
+        </div>
+      </section>
+
+      <!-- ============ VIDEOS ============ -->
+      <section class="page" id="page-videos">
+        <div class="card" style="display:flex; gap:8px; align-items:center;">
+          <input class="input" placeholder="Search videos..." spellcheck="false">
+          <button class="btn">↻</button>
+        </div>
+        <div class="grid" id="video-grid"></div>
+      </section>
+
+      <!-- ============ MUSIC ============ -->
+      <section class="page" id="page-music">
+        <div class="card" style="display:flex; gap:8px; align-items:center;">
+          <input class="input" placeholder="Search music..." spellcheck="false">
+          <button class="btn">↻</button>
+        </div>
+        <div id="music-list"></div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="page" id="page-settings">
+        <div class="card">
+          <div class="field-label">Download</div>
+          <div class="set-row">
+            <div><div class="set-name">Parallel mode</div><div class="set-desc">Max parallel downloads</div></div>
+            <div class="seg"><button class="active">Parallel</button><button>Sequential</button></div>
+          </div>
+          <div class="set-row">
+            <div><div class="set-name">Max parallel downloads</div><div class="set-desc mono">2</div></div>
+            <div class="seg"><button>1</button><button class="active">2</button><button>4</button></div>
+          </div>
+          <div class="field-label" style="margin-top:16px;">Defaults</div>
+          <div class="set-row">
+            <div><div class="set-name">Default resolution</div><div class="set-desc mono">720p</div></div>
+            <div class="seg"><button>480p</button><button class="active">720p</button><button>1080p</button></div>
+          </div>
+          <div class="set-row">
+            <div><div class="set-name">Audio only</div><div class="set-desc">Download MP3 by default</div></div>
+            <div class="switch" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="field-label" style="margin-top:16px;">General</div>
+          <div class="set-row">
+            <div><div class="set-name">Auto clipboard detection</div><div class="set-desc">Poll clipboard for YouTube URLs</div></div>
+            <div class="switch on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="set-row">
+            <div><div class="set-name">Cookies</div><div class="set-desc">Browser or cookies.txt for restricted content</div></div>
+            <button class="btn">Configure</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ============ theme ============ */
+  const themeBtn = document.getElementById('theme-toggle');
+  themeBtn.addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme !== 'dark';
+    root.dataset.theme = dark ? 'dark' : 'light';
+    themeBtn.textContent = dark ? '☀ Dark' : '☾ Light';
+  });
+
+  /* ============ nav ============ */
+  const titles = { queue: 'Download Queue', videos: 'Video Library', music: 'Music Library', settings: 'Settings' };
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + btn.dataset.page).classList.add('active');
+    document.getElementById('page-title').textContent = titles[btn.dataset.page];
+  }));
+
+  /* ============ res pills ============ */
+  document.querySelectorAll('.pill[data-res]').forEach(pill => pill.addEventListener('click', () => {
+    document.querySelectorAll('.pill[data-res]').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+  }));
+  const audioPill = document.getElementById('audio-pill');
+  audioPill.addEventListener('click', () => audioPill.classList.toggle('active'));
+
+  /* ============ sample data ============ */
+  const videos = [
+    ['css-101.webm',     '1.2 MB', 'Sep 21'],
+    ['deploy-final-mix.mp4', '412 MB', 'Sep 19'],
+    ['guitar-loop-final.mov', '88 MB',  'Sep 15'],
+    ['conference-keynote.mp4', '1.9 GB', 'Sep 11'],
+    ['trailer-v2.mkv',   '620 MB', 'Sep 09'],
+    ['night-ride.mp4',   '310 MB', 'Sep 04']
+  ];
+  const songs = [
+    ['Lavender Haze',   'Midnight', '3:22', '9.8 MB'],
+    ['Neon Skyline',    'Unknown Artist', '4:05', '11.2 MB'],
+    ['Last Train',      'Night Drive',   '3:47', '10.4 MB'],
+    ['Glass Waves',     'Flume-copy',    '5:12', '14.6 MB']
+  ];
+  const statusOrder = { pending: 0, paused: 1, downloading: 2, queued: 3, completed: 4, failed: 5 };
+  const statusMeta = {
+    pending:     ['Pending',      'st-pending',   'dot-pending'],
+    paused:      ['Paused',       'st-paused',    'dot-paused'],
+    downloading: ['Downloading',  'st-download',  'dot-download'],
+    completed:   ['Completed',    'st-done',      'dot-done'],
+    failed:      ['Failed',       'st-failed',    'dot-failed']
+  };
+
+  let queue = [
+    { id: 1, title: 'How GPS Actually Works (watch this first)',   res: '720p',  status: 'downloading', pct: 43 },
+    { id: 2, title: 'Building a Linux Router — Full Guide',        res: '1080p', status: 'pending',     pct: 0 },
+    { id: 3, title: 'Pixel Art Animation Fundamentals',            res: 'MP3',   status: 'pending',     pct: 0 },
+    { id: 4, title: 'Rust in 100 Seconds',                         res: '480p',  status: 'completed',   pct: 100 }
+  ];
+
+  /* ============ row render ============ */
+  function rowHTML(item, active) {
+    const [label, cl, dot] = statusMeta[item.status] || statusMeta.pending;
+    const prog = item.status === 'downloading'
+      ? `<div class="row-progress"><span style="width:${item.pct}%"></span></div>`
+      : '';
+    const stats = item.status === 'downloading'
+      ? `<div class="row-stats"><span>${item.pct}%</span><span class="speed">2.4 MB/s</span><span>ETA 0:42</span><span>103 MB / 240 MB</span></div>`
+      : '';
+    const cancel = item.status === 'downloading'
+      ? `<button class="icon-btn" title="Cancel">✕</button>`
+      : '';
+    const actions = `<button class="icon-btn" title="Folder">📁</button>${cancel}
+      <button class="icon-btn delete" title="Delete" onclick="delItem(${item.id})">🗑</button>`;
+    return `<div class="row${active ? ' active-row' : ''}" data-id="${item.id}">
+      <div class="tile">${item.res === 'MP3' ? '♪' : '▼'}</div>
+      <div class="row-main">
+        <div class="row-title${item.status === 'completed' ? ' dim' : ''}">${item.title}</div>
+        <div class="row-meta">
+          <span class="mini-chip">${item.res}</span>
+          <span class="status ${cl}"><span class="dot ${dot}"></span>${label}</span>
+        </div>
+        ${prog}${stats}
+      </div>
+      <div class="row-actions">${actions}</div>
+    </div>`;
+  }
+
+  function renderQueue() {
+    const sort = [...queue].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+    const active = sort.filter(i => i.status === 'downloading');
+    const rest = sort.filter(i => i.status !== 'downloading');
+    document.getElementById('active-list').innerHTML = active.map(i => rowHTML(i, true)).join('');
+    document.getElementById('queue-list').innerHTML = rest.map(i => rowHTML(i, false)).join('');
+    document.getElementById('stat-total').textContent = queue.length;
+    document.getElementById('stat-active').textContent = active.length;
+    document.getElementById('count-badge').textContent = rest.filter(i => ['pending','paused'].includes(i.status)).length + ' items';
+  }
+
+  function delItem(id) {
+    queue = queue.filter(i => i.id !== id);
+    renderQueue();
+  }
+
+  /* ============ link preview ============ */
+  const urlInput = document.getElementById('url-input');
+  const preview = document.getElementById('preview');
+  const previewData = {
+    title: 'How GPS Actually Works (watch this first)',
+    channel: 'Veritasium',
+    duration: '23:41',
+    views: '4.2M views',
+    size: '~240 MB @ 720p'
+  };
+  let previewTimer = null;
+
+  function showPreview() {
+    const url = urlInput.value.trim();
+    if (!url) { hidePreview(); return; }
+    preview.hidden = false;
+    preview.innerHTML = '<div class="preview-state"><span class="spinner"></span>Fetching video info…</div>';
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      preview.innerHTML = `
+        <div class="preview-thumb">▶<span class="dur mono">${previewData.duration}</span></div>
+        <div class="preview-body">
+          <div class="preview-title">${previewData.title}</div>
+          <div class="preview-meta">
+            <span class="mini-chip sub">${previewData.channel}</span>
+            <span class="mini-chip info mono">${previewData.duration}</span>
+            <span class="mini-chip sub">${previewData.views}</span>
+            <span class="mini-chip">${previewData.size}</span>
+          </div>
+        </div>`;
+    }, 650);
+  }
+  function hidePreview() {
+    clearTimeout(previewTimer);
+    preview.hidden = true;
+    preview.innerHTML = '';
+  }
+  urlInput.addEventListener('input', showPreview);
+
+  /* ============ fakes ============ */
+  let nextId = 5;
+  function fakePaste() {
+    urlInput.value = 'https://youtube.com/watch?v=dQw4w9WgXcQ';
+    showPreview();
+  }
+  function fakeAdd() {
+    const url = urlInput.value;
+    if (!url) return;
+    queue.push({ id: nextId++, title: previewData.title, res: '720p', status: 'pending', pct: 0 });
+    urlInput.value = '';
+    hidePreview();
+    renderQueue();
+  }
+  function fakeStart() {
+    queue.forEach(i => { if (i.status === 'pending') { i.status = 'downloading'; i.pct = 1; } });
+    renderQueue();
+    tick();
+  }
+  function fakeStop() {
+    queue.forEach(i => { if (i.status === 'downloading') { i.status = 'paused'; } });
+    renderQueue();
+  }
+  function tick() {
+    let running = false;
+    queue.forEach(i => {
+      if (i.status === 'downloading') {
+        running = true;
+        i.pct = Math.min(100, i.pct + (1 + Math.random() * 3));
+        if (i.pct >= 100) i.status = 'completed';
+      }
+    });
+    renderQueue();
+    if (running) setTimeout(tick, 400);
+  }
+
+  /* ============ videos grid ============ */
+  renderQueue();
+  document.getElementById('video-grid').innerHTML = videos.map(([t, s, d]) => `
+    <div class="vcard">
+      <div class="vthumb">▶<span class="dur mono">8:31</span></div>
+      <div class="vbody">
+        <div class="vtitle">${t}</div>
+        <div class="vmeta"><span>${d}</span><span class="mono">${s}</span></div>
+      </div>
+    </div>`).join('');
+
+  /* ============ music list ============ */
+  document.getElementById('music-list').innerHTML = songs.map(([t, a, dur, s]) => `
+    <div class="row">
+      <div class="tile">♪</div>
+      <div class="row-main">
+        <div class="row-title">${t}</div>
+        <div class="row-meta">
+          <span class="mini-chip sub">${a}</span>
+          <span class="mini-chip info mono">${dur}</span>
+          <span class="mini-chip sub mono">${s}</span>
+        </div>
+      </div>
+      <div class="row-actions">
+        <button class="icon-btn play">▶</button>
+        <button class="icon-btn delete">🗑</button>
+      </div>
+    </div>`).join('');
+</script>
+</body>
+</html>

@@ -1,11 +1,8 @@
 # downloader.py
 import yt_dlp
 import threading
-import os
-import json
 import logging
 import time
-from config import QUEUE_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +12,6 @@ class Downloader:
         self.process = None
         self._cancel_lock = threading.Lock()
         self._cancelled = False
-        self._partial_file = None
         self._thread = None   # store thread for join
 
     @property
@@ -64,65 +60,9 @@ class Downloader:
             if cookie_file and cookie_file.strip():
                 ydl_opts['cookiefile'] = cookie_file.strip()
 
-    def _find_partial_file(self, path, url):
-        try:
-            if os.path.exists(QUEUE_FILE):
-                with open(QUEUE_FILE, 'r') as f:
-                    queue = json.load(f)
-                for item in queue:
-                    if item.get('url') == url and item.get('partial_file'):
-                        partial_path = item.get('partial_file')
-                        if os.path.exists(partial_path):
-                            logger.info(f"Found partial file: {partial_path}")
-                            return partial_path
-            if os.path.exists(path):
-                for f in os.listdir(path):
-                    if f.endswith('.part') or f.endswith('.ytdl'):
-                        full_path = os.path.join(path, f)
-                        if not self._partial_file:
-                            self._partial_file = full_path
-                            logger.info(f"Found orphan partial file: {full_path}")
-            return None
-        except Exception as e:
-            logger.error(f"Error finding partial file: {e}")
-            return None
-
-    def _save_partial_tracking(self, url, partial_file):
-        try:
-            if not os.path.exists(QUEUE_FILE):
-                return
-            with open(QUEUE_FILE, 'r') as f:
-                queue = json.load(f)
-            for item in queue:
-                if item.get('url') == url:
-                    item['partial_file'] = partial_file
-                    item['status'] = 'paused'
-                    break
-            with open(QUEUE_FILE, 'w') as f:
-                json.dump(queue, f, indent=4)
-            logger.info(f"Saved partial tracking for {url}: {partial_file}")
-        except Exception as e:
-            logger.error(f"Failed to save partial tracking: {e}")
-
-    def _clear_partial_tracking(self, url):
-        try:
-            if not os.path.exists(QUEUE_FILE):
-                return
-            with open(QUEUE_FILE, 'r') as f:
-                queue = json.load(f)
-            for item in queue:
-                if item.get('url') == url:
-                    item.pop('partial_file', None)
-                    break
-            with open(QUEUE_FILE, 'w') as f:
-                json.dump(queue, f, indent=4)
-            logger.info(f"Cleared partial tracking for {url}")
-        except Exception as e:
-            logger.error(f"Failed to clear partial tracking: {e}")
-
     def download(self, url, path, resolution, progress_callback, done_callback,
                  audio_only=False, cookie_settings=None, max_retries=3, backoff_factor=2,
-                 stop_event=None):
+                 stop_event=None, info_callback=None):
         def stopped():
             return stop_event is not None and stop_event.is_set()
 
@@ -133,11 +73,6 @@ class Downloader:
                 return
 
             self.cancelled = False
-            self._partial_file = None
-
-            partial_file = self._find_partial_file(path, url)
-            if partial_file:
-                logger.info(f"Resuming download from: {partial_file}")
 
             attempt = 0
             last_exception = None
@@ -155,8 +90,6 @@ class Downloader:
                 def hook(d):
                     if self.cancelled or stopped():
                         raise Exception("Download stopped")
-                    if d['status'] == 'downloading' and 'filename' in d:
-                        self._partial_file = d['filename']
                     if d['status'] == 'downloading':
                         progress_data = d.copy()
                         if 'total_bytes' in d and d['total_bytes'] > 0:
@@ -237,12 +170,16 @@ class Downloader:
                 try:
                     logger.info(f"Starting download: {url}")
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
+                        info = ydl.extract_info(url, download=True)
                     if self.cancelled or stopped():
                         logger.info(f"Download stopped: {url}")
                         done_callback("Download stopped")
                         return
-                    self._clear_partial_tracking(url)
+                    if info_callback and info:
+                        try:
+                            info_callback(info)
+                        except Exception as cb_err:
+                            logger.error(f"info_callback failed: {cb_err}")
                     logger.info(f"Download completed: {url}")
                     done_callback("Download completed successfully!")
                     return
@@ -272,8 +209,6 @@ class Downloader:
                     time.sleep(wait_time)
 
             if not self.cancelled and not stopped():
-                if self._partial_file:
-                    self._save_partial_tracking(url, self._partial_file)
                 error_msg = str(last_exception) if last_exception else "Unknown error"
                 logger.error(f"Download failed after {attempt} attempts: {url} - {error_msg}")
                 done_callback(f"Error: {error_msg}")

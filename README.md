@@ -1,47 +1,47 @@
 # 🎬 Video Downloader
 
-A modular desktop video downloader built with Python, CustomTkinter, and `yt-dlp`. Features a clean sidebar UI with dark/light theme support, a download queue, and local media libraries.
+A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`. Features a Download Console UI with three theme families (each with a dark and a light mode), a real-time download queue, and local media libraries.
 
 ---
 
 ## ✨ Features
 
-### Queue Tab
-- URL input with automatic clipboard detection (YouTube URLs auto-fill)
-- Video preview (title & duration) before downloading
-- Resolution selector (144p – 1080p) and audio-only (MP3) mode
-- Parallel or sequential download modes with configurable concurrency limit
-- Real-time progress bars with speed, ETA, and file size
-- Per-item cancel, prioritize (move up/down), and remove controls
-- Queue persisted to `queue.json` — survives app restarts
-- Download history saved to `history.json`
+### Download Console (Queue)
+- URL input with live validation and a **Paste** button
+- Link preview (title, channel, duration, views, estimated size) fetched off the UI thread
+- Resolution pills (144p – 1080p) and an audio-only (MP3) toggle
+- Parallel or sequential download modes with a configurable concurrency limit
+- Real-time per-row progress with speed, ETA, and transferred size
+- Per-item open-folder, cancel, resume, and delete controls
+- Duplicate detection against both the queue and history
+- Queue persisted to `queue.json` — survives app restarts; interrupted items resume as pending
+- Completed downloads appended to `history.json`
 
-### Video Library Tab
-- Scans the download folder for video files (`.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.flv`, `.wmv`)
-- Displays file name, size, and last-modified date
+### Video Library
+- Scans the download folder for video files (`.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.flv`, `.wmv`, `.m4v`)
+- Thumbnail grid using a local `.thumbs/` cache (falls back to an icon when no thumbnail exists)
 - Search/filter bar
-- Play (opens in VLC or system default player) and delete controls
-- Sidebar storage usage indicator
+- Play (VLC or system default player) and delete controls via context menu
 
-### Music Library Tab
-- Scans the download folder for audio files (`.mp3`, `.flac`, `.m4a`, etc.)
-- Reads metadata via `mutagen` (title, artist, album, duration)
+### Music Library
+- Scans the download folder for audio files (`.mp3`, `.m4a`, `.ogg`, `.flac`, `.wav`)
+- Reads metadata via `mutagen` (title, artist, duration) on a background thread
 - Search/filter bar
-- Play and delete controls
+- Play and delete controls via context menu
 
-### Settings Tab
-- **Download:** parallel vs. sequential mode, max parallel downloads
-- **Defaults:** default resolution, audio-only toggle, default download path
-- **Cookies:** browser cookie extraction (Chrome, Firefox, Edge, Brave, Opera, Safari) or custom cookies file path — useful for age-restricted or members-only content
+### Settings
+- **Download:** parallel vs. sequential mode, max parallel downloads, default resolution, audio-only default
 - **General:** auto clipboard detection toggle, clipboard polling interval
-- **Appearance:** dark/light theme toggle (also available from the top bar)
+- **Cookies:** browser cookie extraction (Chrome, Firefox, Edge, Brave, Opera, Safari) or a custom `cookies.txt` path, plus a **Test cookies** button
+- **Appearance:** theme family (Arisu Pink, SaaS Blue, Arch Blue) and dark/light mode; the top bar keeps a one-click mode toggle
 
 ### UI / General
-- Sidebar navigation with active-tab indicator
-- Top bar with live item count badge and theme toggle
-- Dark and light themes with a teal (`#2BB2A9`) accent, fully consistent across all widgets
+- Sidebar navigation with active-page indicator and a storage meter
+- Collapsible sidebar: the burger button at the top toggles an icon-only rail; the state persists in `settings.json`
+- Top bar with live item count badge and a light/dark mode toggle
+- Three theme families, each with a dark and a light palette: **Arisu Pink** (`#ff79c6`, the original), **SaaS Blue** (`#2563eb` on white) and **Arch Blue** (`#1793d1`) — the single source of truth is `ui/theme.py`
+- Interface scale driven by one token: `ui_scale` in `settings.json` (`1.0` = design size, shipped default `1.5`).
 - VLC auto-detection; falls back to the system default player if VLC is not found
-- Clipboard polling works on native Linux, WSL, and Windows (tries `powershell`, `xclip`, `xsel` in sequence)
 
 ---
 
@@ -49,22 +49,33 @@ A modular desktop video downloader built with Python, CustomTkinter, and `yt-dlp
 
 ```
 video_downloader/
-├── main.py             # Entry point — sets appearance mode, applies theme, starts app
-├── ui.py               # Main App class, sidebar, top bar, tab routing, theme toggle
-├── queue_tab.py        # Download queue UI and download logic
-├── videos_tab.py       # Video library browser
-├── music_tab.py        # Music library browser
-├── settings_tab.py     # Settings UI and persistence
+├── main.py             # PySide6 entry point — applies theme, starts MainWindow
+├── models.py           # DownloadItem dataclass + DownloadStatus enum
+├── queue_manager.py    # Pure-Python queue state machine (thread-safe)
+├── queue_runner.py     # Threaded download executor emitting Qt signals
+├── persistence.py      # Thread-safe atomic JSON (queue, history, settings)
+├── thumb_cache.py      # Thumbnail cache keyed by file name
 ├── downloader.py       # yt-dlp wrapper with progress hooks and cookie support
-├── theme_manager.py    # Color palette definitions and CustomTkinter theme patching
-├── icon_manager.py     # CTkImage loader for all app icons
-├── config.py           # Constants, resolution list, default settings, theme color reference
-├── utils.py            # JSON helpers (history, queue, settings), VLC detection
+├── url_validator.py    # URL validation and sanitising
+├── config.py           # Constants, resolution list, default settings
+├── utils.py            # VLC detection and small helpers
+├── ui/
+│   ├── theme.py        # Theme families × dark/light tokens + QSS stylesheet
+│   ├── sidebar.py      # Navigation rail
+│   ├── main_window.py  # Shell: sidebar + top bar + stacked pages
+│   └── pages/
+│       ├── queue_page.py     # Download Console
+│       ├── media_page.py     # Shared media browser base
+│       ├── videos_page.py    # Video grid
+│       ├── music_page.py     # Music list
+│       └── settings_page.py  # Settings form
+├── tests/              # unittest suite
 ├── history.json        # Download history (auto-created)
 ├── queue.json          # Persisted queue (auto-created)
 ├── settings.json       # User settings (auto-created)
 ├── assets/             # PNG icons (Tabler icon set)
-└── requirements.txt
+├── requirements.txt
+└── pyproject.toml      # Ruff + pytest configuration
 ```
 
 ---
@@ -84,12 +95,12 @@ video_downloader/
 **Debian / Ubuntu / WSL:**
 ```bash
 sudo apt update
-sudo apt install python3 python3-pip python3-tk python3-venv ffmpeg git -y
+sudo apt install python3 python3-pip python3-venv ffmpeg git -y
 ```
 
 **Arch:**
 ```bash
-sudo pacman -S python python-pip tk ffmpeg git
+sudo pacman -S python python-pip ffmpeg git
 ```
 
 **macOS (Homebrew):**
@@ -150,10 +161,10 @@ Go to **Settings → Cookies** and choose one of:
 ## 🧠 How It Works
 
 - `yt-dlp` handles all video/audio extraction and downloading
-- Downloads run in background threads so the UI never freezes
-- Progress is fed back to the UI via `yt-dlp` progress hooks
-- The queue, history, and settings are stored as local JSON files
-- CustomTkinter's theme is patched at runtime so all widgets use the project's own color palette
+- Downloads run in a background thread pool so the UI never freezes; worker threads report back over Qt signals
+- Queue state lives in `queue_manager.py`; a stop request cancels every active downloader so nothing is left half-running
+- The queue, history, and settings are stored as local JSON files written atomically under a single lock
+- The visual system is defined once in `ui/theme.py` as semantic colour tokens rendered to a QSS stylesheet; every family shares the same token names, so widgets never hardcode a hex value
 
 ---
 
