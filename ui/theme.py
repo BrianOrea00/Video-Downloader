@@ -79,6 +79,18 @@ def set_ui_scale(scale: float) -> None:
     _tokens["scale"] = max(0.5, float(scale))
 
 
+def repolish(widget) -> None:
+    """Re-apply the stylesheet after a dynamic property changed.
+
+    Qt only re-evaluates property selectors such as ``[collapsed="true"]`` when
+    the widget is unpolished and polished again.
+    """
+    style = widget.style()
+    style.unpolish(widget)
+    style.polish(widget)
+    widget.update()
+
+
 def ui_scale() -> float:
     return _tokens["scale"]
 
@@ -106,6 +118,7 @@ def font_pt() -> int:
 # Scale-dependent widget metrics, all in design-time (1x) pixels.
 METRICS = {
     "sidebar_width": 240,
+    "sidebar_collapsed_width": 68,
     "topbar_height": 56,
     "logo_mark": 22,
     "shelf": 3,           # storage meter bar height
@@ -159,6 +172,16 @@ _QSS_RAW = """
     QPushButton#NavButton:checked {
         background: $accent; color: $bg_dark; font-weight: 600;
     }
+    /* collapsed rail: glyph only, centred, larger for legibility */
+    QPushButton#NavButton[collapsed="true"] {
+        text-align: center; padding: @{12}px 0; font-size: @{16}px;
+    }
+    QPushButton#BurgerButton {
+        border: 0; background: transparent; color: $gray_light;
+        padding: @{6}px @{8}px; border-radius: @{6}px; font-size: @{15}px;
+    }
+    QPushButton#BurgerButton:hover { background: $hover; color: $text; }
+    QPushButton#BurgerButton:focus { border: 1px solid $accent; }
     #StorageHead { font-size: @{10}px; color: $gray_light; }
     #Track { background: $border; border-radius: @{2}px; }
     #TrackFill { background: $accent; border-radius: @{2}px; }

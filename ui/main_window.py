@@ -58,6 +58,9 @@ class MainWindow(QMainWindow):
 
         self.sidebar = Sidebar()
         self.sidebar.navigate.connect(self.show_page)
+        self.sidebar.collapsed_changed.connect(self._on_sidebar_collapsed)
+        self.sidebar.set_collapsed(bool(self.settings.get("sidebar_collapsed", False)),
+                                   notify=False)
         row.addWidget(self.sidebar)
 
         content = QWidget()
@@ -132,6 +135,11 @@ class MainWindow(QMainWindow):
         refresh = getattr(page, "refresh", None)
         if callable(refresh):
             refresh()
+
+    # -- sidebar -----------------------------------------------------------
+    def _on_sidebar_collapsed(self, collapsed: bool) -> None:
+        self.settings["sidebar_collapsed"] = collapsed
+        save_settings(self.settings)
 
     # -- theme -------------------------------------------------------------
     def toggle_theme(self) -> None:

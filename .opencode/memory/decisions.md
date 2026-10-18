@@ -11,6 +11,8 @@
 - **Settings checkbox labels are short ("Enabled") with the full sentence in `setAccessibleName()`**: a long checkbox label is a hard minimum width and made the Settings page overflow horizontally at 2x.
 - **Media empty state**: the grid cell holds only `empty_title`; `empty_hint` goes in the status line (full width, no wrapping/clipping). Grid/icon sizes scale via `METRICS`.
 
+- **Sidebar collapse state persists** in `settings.json` as `sidebar_collapsed` (default `False`). `MainWindow` applies it with `set_collapsed(..., notify=False)` so restoring does not re-save. Collapsed = glyph-only nav, tooltip carries the label (the text is gone, so the tooltip is not redundant).
+
 # Known issues / limitations
 - At `ui_scale = 1.5` the app's minimum window is 1350x900; at `2.0` it is ~1728x972 (clamped to 90% of the screen). Below the effective minimum, pages overflow horizontally. Adjust `ui_scale` in `settings.json`.
 - No Settings UI control for `ui_scale` yet; it is settings.json-only.
