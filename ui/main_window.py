@@ -22,7 +22,8 @@ from ui.pages.queue_page import QueuePage
 from ui.pages.settings_page import SettingsPage
 from ui.pages.videos_page import VideosPage
 from ui.sidebar import Sidebar
-from ui.theme import METRICS, apply_theme, px
+from ui.theme import (DEFAULT_FAMILY, DEFAULT_MODE, METRICS, MODES, THEMES,
+                       apply_theme, flip_mode, px)
 
 TITLES = {
     "queue": "Download Queue",
@@ -36,7 +37,8 @@ class MainWindow(QMainWindow):
     def __init__(self, settings: dict) -> None:
         super().__init__()
         self.settings = settings
-        self.theme = settings.get("theme", "dark")
+        self.family = settings.get("theme_family", DEFAULT_FAMILY)
+        self.mode = settings.get("theme", DEFAULT_MODE)
 
         self.setWindowTitle("Video Downloader")
         # Scale the window with the UI, but never demand more than the screen has.
@@ -85,6 +87,7 @@ class MainWindow(QMainWindow):
         }
         self.queue_page.download_completed.connect(self._refresh_current)
         self.settings_page.settings_changed.connect(self.queue_page.apply_defaults)
+        self.settings_page.theme_changed.connect(self.set_theme)
         for page in self.pages.values():
             self.stack.addWidget(page)
         column.addWidget(self.stack, 1)
@@ -142,24 +145,32 @@ class MainWindow(QMainWindow):
         save_settings(self.settings)
 
     # -- theme -------------------------------------------------------------
-    def toggle_theme(self) -> None:
-        self.theme = "light" if self.theme == "dark" else "dark"
-        self.settings["theme"] = self.theme
+    def set_theme(self, family: str, mode: str) -> None:
+        """Apply and persist a theme choice (top bar toggle or settings page)."""
+        self.family = family if family in THEMES else DEFAULT_FAMILY
+        self.mode = mode if mode in MODES else DEFAULT_MODE
+        self.settings["theme_family"] = self.family
+        self.settings["theme"] = self.mode
         save_settings(self.settings)
         app = QApplication.instance()
         if app is not None:
-            apply_theme(app, self.theme)
+            apply_theme(app, self.family, self.mode)
+        self.settings_page.sync_theme_controls(self.family, self.mode)
         self._refresh_current()
         self._sync_theme_button()
 
+    def toggle_theme(self) -> None:
+        """Quick toggle: keep the family, flip dark/light."""
+        self.set_theme(self.family, flip_mode(self.mode))
+
     def _sync_theme_button(self) -> None:
         # Label states the action, matching the prototype's "☾ Light".
-        if self.theme == "dark":
+        if self.mode == "dark":
             text = "\u263e Light"
-            hint = "Switch to light theme"
+            hint = "Switch to light mode"
         else:
             text = "\u2600 Dark"
-            hint = "Switch to dark theme"
+            hint = "Switch to dark mode"
         self.theme_btn.setText(text)
         self.theme_btn.setAccessibleName(hint)
 

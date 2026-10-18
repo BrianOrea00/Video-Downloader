@@ -1,6 +1,6 @@
 # 🎬 Video Downloader
 
-A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`. Features a Download Console UI with dark/light themes, a real-time download queue, and local media libraries.
+A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`. Features a Download Console UI with three theme families (each with a dark and a light mode), a real-time download queue, and local media libraries.
 
 ---
 
@@ -33,13 +33,13 @@ A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`
 - **Download:** parallel vs. sequential mode, max parallel downloads, default resolution, audio-only default
 - **General:** auto clipboard detection toggle, clipboard polling interval
 - **Cookies:** browser cookie extraction (Chrome, Firefox, Edge, Brave, Opera, Safari) or a custom `cookies.txt` path, plus a **Test cookies** button
-- **Appearance:** dark/light theme toggle from the top bar
+- **Appearance:** theme family (Arisu Pink, SaaS Blue, Arch Blue) and dark/light mode; the top bar keeps a one-click mode toggle
 
 ### UI / General
 - Sidebar navigation with active-page indicator and a storage meter
 - Collapsible sidebar: the burger button at the top toggles an icon-only rail; the state persists in `settings.json`
-- Top bar with live item count badge and theme toggle
-- Dark and light themes with an arisu-pink (`#ff79c6`) accent — the single source of truth is `ui/theme.py`
+- Top bar with live item count badge and a light/dark mode toggle
+- Three theme families, each with a dark and a light palette: **Arisu Pink** (`#ff79c6`, the original), **SaaS Blue** (`#2563eb` on white) and **Arch Blue** (`#1793d1`) — the single source of truth is `ui/theme.py`
 - Interface scale driven by one token: `ui_scale` in `settings.json` (`1.0` = design size, shipped default `1.5`).
 - VLC auto-detection; falls back to the system default player if VLC is not found
 
@@ -60,7 +60,7 @@ video_downloader/
 ├── config.py           # Constants, resolution list, default settings
 ├── utils.py            # VLC detection and small helpers
 ├── ui/
-│   ├── theme.py        # Colour tokens + QSS stylesheet (dark/light)
+│   ├── theme.py        # Theme families × dark/light tokens + QSS stylesheet
 │   ├── sidebar.py      # Navigation rail
 │   ├── main_window.py  # Shell: sidebar + top bar + stacked pages
 │   └── pages/
@@ -164,7 +164,7 @@ Go to **Settings → Cookies** and choose one of:
 - Downloads run in a background thread pool so the UI never freezes; worker threads report back over Qt signals
 - Queue state lives in `queue_manager.py`; a stop request cancels every active downloader so nothing is left half-running
 - The queue, history, and settings are stored as local JSON files written atomically under a single lock
-- The visual system is defined once in `ui/theme.py` as semantic colour tokens rendered to a QSS stylesheet
+- The visual system is defined once in `ui/theme.py` as semantic colour tokens rendered to a QSS stylesheet; every family shares the same token names, so widgets never hardcode a hex value
 
 ---
 

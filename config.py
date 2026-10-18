@@ -5,7 +5,8 @@ QUEUE_FILE = "queue.json"
 SETTINGS_FILE = "settings.json"
 
 DEFAULT_SETTINGS = {
-    "theme": "dark",  # Changed to dark as default (your dark palette is primary)
+    "theme": "dark",  # Colour mode: "dark" or "light"
+    "theme_family": "arisu",  # Palette: "arisu", "saas" or "arch"
     "parallel_limit": 2,
     "download_mode": "parallel",
     "auto_clipboard": True,

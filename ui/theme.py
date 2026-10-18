@@ -1,9 +1,10 @@
 # ui/theme.py
 """Qt design system: semantic colour tokens + a QSS stylesheet.
 
-Palette and layout tokens come from ``docs/ui-prototype.html`` (arisu-pink,
-PHASES.md §4). Two themes — dark and light — share the same token names so
-widgets never reference a raw hex value.
+Three theme families — ``arisu`` (the original arisu-pink, from
+``docs/ui-prototype.html`` / PHASES.md §4), ``saas`` (blue on white) and
+``arch`` (Arch Linux blue) — each with a ``dark`` and a ``light`` mode. Every
+palette shares the same token names so widgets never reference a raw hex value.
 """
 from __future__ import annotations
 
@@ -14,52 +15,161 @@ from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
 
 # Semantic tokens per theme. Keys are shared across both themes.
-TOKENS: dict[str, dict[str, str]] = {
-    "dark": {
-        "bg": "#0a0710",
-        "bg_dark": "#05030a",
-        "sidebar": "#08050e",
-        "topbar": "#0c0814",
-        "card": "#0f0b17",
-        "popup": "#130e1c",
-        "hover": "#1f192b",
-        "border": "#2a1f3a",
-        "text": "#f8f2ff",
-        "text_2": "#c9c3d4",
-        "muted": "#6b5b7e",
-        "gray_light": "#8a7f9a",
-        "accent": "#ff79c6",
-        "pink_dim": "#e35aa5",
-        "info": "#bd93f9",
-        "success": "#50fa7b",
-        "error": "#ff5555",
-        "warning": "#ffb86c",
-        "paused": "#f1fa8c",
-        "track": "#3d3448",
+THEMES: dict[str, dict[str, dict[str, str]]] = {
+    # The original palette: arisu-pink (the user's nvim colorscheme).
+    "arisu": {
+        "dark": {
+            "bg": "#0a0710",
+            "bg_dark": "#05030a",
+            "sidebar": "#08050e",
+            "topbar": "#0c0814",
+            "card": "#0f0b17",
+            "popup": "#130e1c",
+            "hover": "#1f192b",
+            "border": "#2a1f3a",
+            "text": "#f8f2ff",
+            "text_2": "#c9c3d4",
+            "muted": "#6b5b7e",
+            "gray_light": "#8a7f9a",
+            "accent": "#ff79c6",
+            "accent_dim": "#e35aa5",
+            "info": "#bd93f9",
+            "success": "#50fa7b",
+            "error": "#ff5555",
+            "warning": "#ffb86c",
+            "paused": "#f1fa8c",
+            "track": "#3d3448",
+        },
+        "light": {
+            "bg": "#fdfaff",
+            "bg_dark": "#f7f2fb",
+            "sidebar": "#f2ecfa",
+            "topbar": "#fdfaff",
+            "card": "#ffffff",
+            "popup": "#ffffff",
+            "hover": "#ece4f5",
+            "border": "#d9cfe6",
+            "text": "#2a1e33",
+            "text_2": "#6b5b7e",
+            "muted": "#8a7f9a",
+            "gray_light": "#6b5b7e",
+            "accent": "#c1549c",
+            "accent_dim": "#a83e80",
+            "info": "#7a5bbf",
+            "success": "#3ec96a",
+            "error": "#e34c4c",
+            "warning": "#e8833c",
+            "paused": "#c9a227",
+            "track": "#d9cfe6",
+        },
     },
-    "light": {
-        "bg": "#fdfaff",
-        "bg_dark": "#f7f2fb",
-        "sidebar": "#f2ecfa",
-        "topbar": "#fdfaff",
-        "card": "#ffffff",
-        "popup": "#ffffff",
-        "hover": "#ece4f5",
-        "border": "#d9cfe6",
-        "text": "#2a1e33",
-        "text_2": "#6b5b7e",
-        "muted": "#8a7f9a",
-        "gray_light": "#6b5b7e",
-        "accent": "#c1549c",
-        "pink_dim": "#a83e80",
-        "info": "#7a5bbf",
-        "success": "#3ec96a",
-        "error": "#e34c4c",
-        "warning": "#e8833c",
-        "paused": "#c9a227",
-        "track": "#d9cfe6",
+    # Blue on white SaaS look. The accent is dark enough to stay legible as the
+    # fill of a primary button in light mode.
+    "saas": {
+        "dark": {
+            "bg": "#0b1220",
+            "bg_dark": "#070d18",
+            "sidebar": "#0a1020",
+            "topbar": "#0d1526",
+            "card": "#111a2e",
+            "popup": "#16203a",
+            "hover": "#1b2740",
+            "border": "#263451",
+            "text": "#f5f8ff",
+            "text_2": "#c3cde0",
+            "muted": "#8593ad",
+            "gray_light": "#9aa7bd",
+            "accent": "#3b82f6",
+            "accent_dim": "#2f6fd8",
+            "info": "#60a5fa",
+            "success": "#34d399",
+            "error": "#f87171",
+            "warning": "#fbbf24",
+            "paused": "#facc15",
+            "track": "#223049",
+        },
+        "light": {
+            "bg": "#f8fafc",
+            "bg_dark": "#f1f5f9",
+            "sidebar": "#eef2f7",
+            "topbar": "#ffffff",
+            "card": "#ffffff",
+            "popup": "#ffffff",
+            "hover": "#e8eef7",
+            "border": "#d3dced",
+            "text": "#0f172a",
+            "text_2": "#475569",
+            "muted": "#64748b",
+            "gray_light": "#64748b",
+            "accent": "#2563eb",
+            "accent_dim": "#1d4ed8",
+            "info": "#2563eb",
+            "success": "#15803d",
+            "error": "#dc2626",
+            "warning": "#b45309",
+            "paused": "#a16207",
+            "track": "#dbe3f0",
+        },
+    },
+    # Arch Linux blue #1793D1. Light mode darkens the accent so the button text
+    # stays legible; dark mode keeps the official shade.
+    "arch": {
+        "dark": {
+            "bg": "#0b0f14",
+            "bg_dark": "#06090c",
+            "sidebar": "#0a0e13",
+            "topbar": "#0d1218",
+            "card": "#11171f",
+            "popup": "#151c26",
+            "hover": "#1b242f",
+            "border": "#26313d",
+            "text": "#e8f1f8",
+            "text_2": "#b6c6d4",
+            "muted": "#7d90a1",
+            "gray_light": "#8d9fb0",
+            "accent": "#1793d1",
+            "accent_dim": "#127cb0",
+            "info": "#33b1ff",
+            "success": "#4ade80",
+            "error": "#f87171",
+            "warning": "#fbbf24",
+            "paused": "#facc15",
+            "track": "#1d2833",
+        },
+        "light": {
+            "bg": "#f9fbfd",
+            "bg_dark": "#eef4f9",
+            "sidebar": "#eaf2f8",
+            "topbar": "#ffffff",
+            "card": "#ffffff",
+            "popup": "#ffffff",
+            "hover": "#e3eef7",
+            "border": "#cadbe8",
+            "text": "#0f1720",
+            "text_2": "#46586a",
+            "muted": "#5c6f80",
+            "gray_light": "#5c6f80",
+            "accent": "#0e73a8",
+            "accent_dim": "#0b5c88",
+            "info": "#0e73a8",
+            "success": "#15803d",
+            "error": "#dc2626",
+            "warning": "#b45309",
+            "paused": "#a16207",
+            "track": "#d5e3ee",
+        },
     },
 }
+
+THEME_LABELS = {
+    "arisu": "Arisu Pink",
+    "saas": "SaaS Blue",
+    "arch": "Arch Blue",
+}
+MODES = ("dark", "light")
+MODE_LABELS = {"dark": "Dark", "light": "Light"}
+DEFAULT_FAMILY = "arisu"
+DEFAULT_MODE = "dark"
 
 UI_FONT = "Monocraft"
 FALLBACK_FONT = "monospace"
@@ -76,7 +186,7 @@ BASE_FONT_PT = 10     # QFont point size
 
 def set_ui_scale(scale: float) -> None:
     """Set the global UI scale (1.0 = design size, 2.0 = double)."""
-    _tokens["scale"] = max(0.5, float(scale))
+    _state["scale"] = max(0.5, float(scale))
 
 
 def repolish(widget) -> None:
@@ -92,7 +202,7 @@ def repolish(widget) -> None:
 
 
 def ui_scale() -> float:
-    return _tokens["scale"]
+    return _state["scale"]
 
 
 def px(base: int) -> int:
@@ -102,7 +212,7 @@ def px(base: int) -> int:
     """
     if base <= 0:
         return base
-    return max(1, round(base * _tokens["scale"]))
+    return max(1, round(base * _state["scale"]))
 
 
 def font_size() -> int:
@@ -112,7 +222,7 @@ def font_size() -> int:
 
 def font_pt() -> int:
     """Body font point size for ``QFont``."""
-    return max(1, round(BASE_FONT_PT * _tokens["scale"]))
+    return max(1, round(BASE_FONT_PT * _state["scale"]))
 
 
 # Scale-dependent widget metrics, all in design-time (1x) pixels.
@@ -138,11 +248,11 @@ METRICS = {
     "min_window_h": 600,
 }
 
-# Tracks the active theme/scale so widget code can pull values on demand.
-_tokens = {"scale": BASE_UI_SCALE, "theme": "dark"}
+# Tracks the active scale and theme so widget code can pull values on demand.
+_state = {"scale": BASE_UI_SCALE, "family": DEFAULT_FAMILY, "mode": DEFAULT_MODE}
 
 # QSS template. ``@{n}`` is a design-time pixel value scaled by :func:`px`;
-# ``$name`` is a colour token from :data:`TOKENS`. Hairline borders stay 1px.
+# ``$name`` is a colour token from :data:`THEMES`. Hairline borders stay 1px.
 _QSS_RAW = """
     QWidget {
         background: $bg;
@@ -207,7 +317,7 @@ _QSS_RAW = """
         background: $accent; color: $bg_dark;
         border-color: transparent; font-weight: 600;
     }
-    QPushButton#PrimaryButton:hover { background: $pink_dim; }
+    QPushButton#PrimaryButton:hover { background: $accent_dim; }
     QPushButton#DangerButton {
         background: transparent; color: $error; border-color: $error;
     }
@@ -289,20 +399,46 @@ _QSS_RAW = """
 _PX_RE = re.compile(r"@\{(\d+)\}")
 
 
-def stylesheet(theme: str) -> str:
-    """QSS for ``"dark"`` or ``"light"`` at the active UI scale."""
-    tokens = dict(TOKENS.get(theme, TOKENS["dark"]))
+def family_names() -> list[str]:
+    """Theme families in display order."""
+    return list(THEMES)
+
+
+def tokens(family: str | None = None, mode: str | None = None) -> dict[str, str]:
+    """Colour tokens for a family/mode.
+
+    Omitted arguments read the *active* theme, not the built-in defaults, so a
+    bare ``tokens()`` and :func:`stylesheet` always agree with :func:`apply_theme`.
+    """
+    family = family if family in THEMES else _state["family"]
+    mode = mode if mode in THEMES[family] else _state["mode"]
+    return THEMES[family][mode]
+
+
+def stylesheet(family: str | None = None, mode: str | None = None) -> str:
+    """QSS for a family/mode at the active UI scale."""
     body = _PX_RE.sub(lambda m: str(px(int(m.group(1)))), _QSS_RAW)
-    return Template(body).substitute(size=f"{font_size()}px", **tokens)
+    return Template(body).substitute(size=f"{font_size()}px",
+                                     **tokens(family, mode))
 
 
-def current_theme() -> str:
-    return _tokens["theme"]
+def current_family() -> str:
+    return _state["family"]
+
+
+def current_mode() -> str:
+    return _state["mode"]
+
+
+def flip_mode(mode: str | None = None) -> str:
+    """The opposite mode, defaulting to the active one."""
+    current = mode if mode in MODES else _state["mode"]
+    return "light" if current == "dark" else "dark"
 
 
 def color(key: str) -> str:
-    """Resolve a semantic token against the currently applied theme."""
-    return TOKENS[_tokens["theme"]].get(key, "#ff00ff")
+    """Resolve a semantic token against the active family and mode."""
+    return tokens(_state["family"], _state["mode"]).get(key, "#ff00ff")
 
 
 def resolve_font() -> QFont:
@@ -312,8 +448,25 @@ def resolve_font() -> QFont:
     return QFont(family, font_pt())
 
 
-def apply_theme(app: QApplication, theme: str) -> None:
-    """Apply the palette, font and scale to the running application."""
-    _tokens["theme"] = theme
+def apply_theme(app: QApplication, family: str | None = None,
+                mode: str | None = None) -> None:
+    """Apply a palette, the font and the scale to the running application.
+
+    An omitted argument keeps the current value; an unrecognised one falls back
+    to the default. ``apply_theme(app, "light")`` is still accepted and reads as
+    a mode, since no family is called ``"light"``.
+    """
+    if family in MODES and family not in THEMES:
+        family, mode = None, family
+    if family is None:
+        family = _state["family"]
+    elif family not in THEMES:
+        family = DEFAULT_FAMILY
+    if mode is None:
+        mode = _state["mode"]
+    elif mode not in MODES:
+        mode = DEFAULT_MODE
+    _state["family"] = family
+    _state["mode"] = mode
     app.setFont(resolve_font())
-    app.setStyleSheet(stylesheet(theme))
+    app.setStyleSheet(stylesheet())

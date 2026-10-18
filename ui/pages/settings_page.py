@@ -23,7 +23,8 @@ from PySide6.QtWidgets import (
 )
 
 from config import RESOLUTIONS
-from ui.theme import METRICS, px
+from ui.theme import (DEFAULT_FAMILY, DEFAULT_MODE, METRICS, MODE_LABELS, MODES,
+                       THEME_LABELS, family_names, px)
 from downloader import Downloader
 from persistence import save_settings
 
@@ -63,6 +64,7 @@ def _desc(text: str) -> QLabel:
 
 class SettingsPage(QWidget):
     settings_changed = Signal()
+    theme_changed = Signal(str, str)  # (family, mode)
 
     def __init__(self, settings: dict, parent=None) -> None:
         super().__init__(parent)
@@ -86,6 +88,7 @@ class SettingsPage(QWidget):
         col.addWidget(self._download_card())
         col.addWidget(self._general_card())
         col.addWidget(self._cookies_card())
+        col.addWidget(self._appearance_card())
 
         save_row = QHBoxLayout()
         self.status = QLabel("")
@@ -210,6 +213,24 @@ class SettingsPage(QWidget):
         self._sync_cookie_enabled()
         return card
 
+    def _appearance_card(self) -> QFrame:
+        card, form = self._card("APPEARANCE")
+
+        self.theme_family = QComboBox()
+        for key in family_names():
+            self.theme_family.addItem(THEME_LABELS.get(key, key), key)
+        self._select(self.theme_family, self.settings.get("theme_family", DEFAULT_FAMILY))
+        self.theme_family.currentIndexChanged.connect(self._on_theme_changed)
+        form.addRow(self._label("Theme", "Colour family for the whole app."), self.theme_family)
+
+        self.theme_mode = QComboBox()
+        for mode in MODES:
+            self.theme_mode.addItem(MODE_LABELS.get(mode, mode.title()), mode)
+        self._select(self.theme_mode, self.settings.get("theme", DEFAULT_MODE))
+        self.theme_mode.currentIndexChanged.connect(self._on_theme_changed)
+        form.addRow(self._label("Mode", "Dark or light variant of the theme."), self.theme_mode)
+        return card
+
     # -- helpers -----------------------------------------------------------
     @staticmethod
     def _label(name: str, description: str) -> QWidget:
@@ -241,6 +262,21 @@ class SettingsPage(QWidget):
 
     def _on_mode(self) -> None:
         self._set("download_mode", self.mode.currentData())
+
+    def sync_theme_controls(self, family: str, mode: str) -> None:
+        """Reflect a theme applied elsewhere (top bar toggle) without re-emitting."""
+        for combo, value in ((self.theme_family, family), (self.theme_mode, mode)):
+            combo.blockSignals(True)
+            self._select(combo, value)
+            combo.blockSignals(False)
+
+    def _on_theme_changed(self) -> None:
+        """Apply a theme choice immediately, then let the window persist it."""
+        family = self.theme_family.currentData()
+        mode = self.theme_mode.currentData()
+        self.settings["theme_family"] = family
+        self.settings["theme"] = mode
+        self.theme_changed.emit(family, mode)
 
     def _on_cookie_method(self) -> None:
         self._set("cookie_method", self.cookie_method.currentData())
