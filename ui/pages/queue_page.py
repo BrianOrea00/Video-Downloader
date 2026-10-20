@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFileDialog,
@@ -131,6 +132,19 @@ class ThumbWorker(QThread):
             thumb_cache.store(self._path, self._filename, data)
 
 
+class PreviewThumbWorker(QThread):
+    """Fetches a preview thumbnail off the GUI thread; emits raw image bytes."""
+
+    fetched = Signal(object)  # bytes | None
+
+    def __init__(self, thumb_url: str, parent=None) -> None:
+        super().__init__(parent)
+        self._url = thumb_url
+
+    def run(self) -> None:
+        self.fetched.emit(thumb_cache.fetch(self._url))
+
+
 class QueueRow(QFrame):
     """One queue line: tile, title, chips, progress, stats, actions."""
 
@@ -237,6 +251,7 @@ class QueuePage(QWidget):
         self._preview_url: str | None = None
         self._info_worker: InfoWorker | None = None
         self._thumb_workers: set[ThumbWorker] = set()
+        self._preview_workers: set[PreviewThumbWorker] = set()
         self._last_sanitized: str | None = None
 
         self.manager.load()
@@ -479,7 +494,9 @@ class QueuePage(QWidget):
         thumb.setObjectName("RowTile")
         thumb.setFixedSize(px(METRICS["row_thumb_w"]), px(METRICS["row_thumb_h"]))
         thumb.setAlignment(Qt.AlignCenter)
+        thumb.setScaledContents(False)
         self.preview_layout.addWidget(thumb)
+        self._load_preview_thumb(info, thumb)
 
         body = QVBoxLayout()
         body.setSpacing(px(4))
@@ -503,6 +520,36 @@ class QueuePage(QWidget):
         body.addLayout(chips)
         self.preview_layout.addLayout(body, 1)
         self.preview.setVisible(True)
+
+    def _load_preview_thumb(self, info: dict, tile: QLabel) -> None:
+        """Fetch the preview thumbnail off-thread and paint it into ``tile``."""
+        thumb_url = info.get("thumbnail")
+        if not thumb_url:
+            return
+        preview_url = self._preview_url
+        worker = PreviewThumbWorker(thumb_url, self)
+
+        def apply(data) -> None:
+            # Ignore a late result for a URL the user has already replaced.
+            if preview_url is None or preview_url != self._preview_url or not data:
+                return
+            pixmap = QPixmap()
+            if not pixmap.loadFromData(data):
+                return
+            scaled = pixmap.scaled(
+                tile.width(), tile.height(),
+                Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation,
+            )
+            tile.setPixmap(scaled)
+
+        worker.fetched.connect(apply)
+        worker.finished.connect(lambda w=worker: self._release_preview_worker(w))
+        self._preview_workers.add(worker)
+        worker.start()
+
+    def _release_preview_worker(self, worker: PreviewThumbWorker) -> None:
+        self._preview_workers.discard(worker)
+        worker.deleteLater()
 
     # -- queue actions -----------------------------------------------------
     def add_to_queue(self) -> None:
