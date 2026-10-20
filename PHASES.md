@@ -474,3 +474,285 @@ for all text, including the numeric readouts.
 | 6 | Resume + cookie test | Completed |
 | 7 | Hardening | Completed (Python items) — `pyproject.toml` (ruff) + tests added, thread-safe `persistence.py`, `where` fallback, host-match hardening, explicit `except` handling. The Tk-only items (icon caching, theme flash) are moot — see Phase 8. |
 | 8 | PySide6 port (replaces 3/4/5 UI) | Completed — sub-steps 1-8 done; Tk modules deleted, `requirements.txt` is PySide6-only, README rewritten |
+| 9 | Remaining backlog | Planned — clipboard polling, `ui_scale` control, history viewer/cap, queue reorder, dead-code cleanup. See §6. |
+| 10 | Public-release blockers | Planned — data dirs, bundled assets/font, ffmpeg + yt-dlp extras, single instance, icon/version, first-run onboarding. See §7.3–7.4. |
+| 11 | License + repo hygiene | Planned — GPL-3, third-party notices, CI matrix, templates. See §7.2, §7.9. |
+| 12 | Engine update path | Planned — runtime yt-dlp wheel swap; frozen-importer proof first. See §7.6. |
+| 13 | Packaging + signing | Planned — PyInstaller one-dir per OS, AppImage/Inno/dmg, code signing/notarization. See §7.5. |
+| 14 | First public release | Planned — docs, screenshots, support policy. See §7.10. |
+
+---
+
+## 6. Remaining Backlog (post-Phase 8)
+
+State at time of writing: tree clean, 36 unittest tests pass
+(`yt-env/bin/python -m unittest discover -s tests -t .`). No active plan. Items are
+ordered by value, not by file.
+
+### 6.1 Clipboard auto-detection is still dead UI
+
+`config.py:12-13` defines `auto_clipboard` and `clipboard_interval`;
+`ui/pages/settings_page.py:157-169` renders and persists both controls. Nothing polls the
+clipboard: `ui/pages/queue_page.py:418` reads `QApplication.clipboard()` only when the
+user clicks paste. Two settings are inert, and the decision record still lists this as
+"not yet wired".
+
+**Fix:** own a `QTimer` in `QueuePage`, interval from `clipboard_interval`, gated by
+`auto_clipboard`; validate through `url_validator`; skip when the URL field has focus or
+the text is unchanged from the last seen value; stop polling while a preview fetch is in
+flight.
+
+**Verify:** copying a supported URL auto-fills and previews; unsupported text is ignored;
+toggling the setting off stops polling immediately; interval change re-arms the timer.
+
+### 6.2 `ui_scale` has no Settings control
+
+`config.py:20` and `main.py:20` read the value once at startup; there is no widget. At
+`1.5` the minimum window is 1350x900, at `2.0` ~1728x972, so this is not a cosmetic knob.
+
+**Fix:** add a scale control to the Settings APPEARANCE card (discrete steps 1.0/1.25/
+1.5/1.75/2.0), persist via the existing `settings_changed` path, and note that a restart
+applies it — re-scaling the live window is larger than this item.
+
+**Verify:** changing the control writes `settings.json`; restart renders at the new scale
+with no clipped labels and pages still navigable.
+
+### 6.3 History has no viewer, no clear, no cap
+
+`persistence.py:66-76` appends forever and only `ui/pages/queue_page.py:624` writes.
+`history.json` grows unbounded and is only consumed for duplicate detection.
+
+**Fix:** add a clear-history action (confirm dialog, then `save_history([])` style atomic
+write) and a cap (e.g. 1000 most recent entries, trimmed on write). A full history page is
+optional and out of scope for this item.
+
+**Verify:** clear empties history without touching the queue; a 1000-entry history stays
+at 1000 after another append; duplicate detection still works on retained entries.
+
+### 6.4 Queue prioritize (move up/down) not ported
+
+Dropped during the port and recorded as a known limitation. The manager has no reorder
+API, so this needs a `QueueManager` method plus row buttons.
+
+**Fix:** `QueueManager.reorder(index, delta)` guarded to `pending`/`paused` items only,
+persisting through the injected store; wire up/down actions on the queue row.
+
+**Verify:** reorder persists across restart; running and completed rows cannot be moved;
+unit test covers clamping at both ends.
+
+### 6.5 Dead legacy code in `utils.py` and `config.py`
+
+- `utils.py`: `save_history` (5), `clean_filename` (22), `load_queue` (25),
+  `save_queue` (35), `load_settings` (40), `save_settings` (51) are all superseded by
+  `persistence.py` and have no callers. `utils.py` also still carries the Phase 7
+  leftovers: bare `except:` at 32, 48, 87 and a `which`-only PATH lookup at 84 that does
+  not work on Windows.
+- Only `detect_vlc` is live, imported inline at `ui/pages/media_page.py:281`.
+- `config.py:25-46` still holds a `THEMES` dict commented "CustomTkinter custom theme
+  handles colors". `ui/theme.py:18` owns palettes now; `config.THEMES` has no readers.
+
+**Fix:** move `detect_vlc` into `utils.py`'s surviving role as the single live helper
+(fix the Windows `where` fallback and replace the bare excepts with explicit ones), delete
+the duplicated JSON helpers and `clean_filename` after confirming zero callers, and delete
+`config.THEMES`.
+
+**Verify:** `grep` shows no references to the removed names; app launches, VLC detection
+still returns a path on Linux; tests still pass.
+
+### 6.6 Order
+
+6.1 → 6.2 → 6.5 → 6.4 → 6.3. 6.5 is a pure cleanup and can ride along with any other
+change; 6.3 needs a small UI decision (where the clear action lives) before it starts.
+
+---
+
+## 7. Public Release Readiness
+
+Goal: hand the app to users who do not have this repo, this venv, Monocraft installed,
+or ffmpeg on PATH. Everything below was measured against the current tree, not assumed.
+
+Current state: 36 core tests pass; no CI, no `LICENSE`, no `.spec`, no `.ico`/`.icns`,
+no `.desktop` file. The app works because the cwd is writable and the host has the font
+and ffmpeg.
+
+### 7.1 Measured facts
+
+| Item | Value |
+|------|-------|
+| `PySide6` install size | 673 MB; `PySide6/Qt/lib` = 457 MB incl. `libQt6WebEngineCore.so.6` |
+| Qt modules imported by the app | `QtCore` ×6, `QtGui` ×2, `QtWidgets` ×9 — nothing else |
+| `yt_dlp` / `mutagen` size | 25 MB / 1.7 MB |
+| `requirements.txt` yt-dlp pin | `2026.3.17` (`requirements.txt:1`) |
+| yt-dlp actually installed | `2026.8.19` (= current PyPI latest) |
+| yt-dlp default extras present | none (`requests`, `websockets`, `certifi`, `brotli`, `Cryptodome`, `yt_dlp_ejs`, `secretstorage` all absent) |
+| PyInstaller / platformdirs | not installed / not installed |
+
+### 7.2 License — decides the project license
+
+| Dependency | License | Consequence |
+|------------|---------|-------------|
+| `mutagen` 1.47 | `GPL-2.0-or-later` | **forces a GPL-compatible app license**; MIT/Apache is not possible while bundling it |
+| `PySide6` 6.12 | `LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0` | choosing GPL-3 for the app removes LGPL relinking duties |
+| `yt-dlp` | Unlicense | none |
+| Tabler icons (`README.md:76`) | MIT | ship copyright + permission text |
+| Monocraft (planned bundle) | OFL-1.1 | ship `OFL.txt`; unmodified bundling only |
+| PyInstaller | GPLv2+ w/ bootloader exception | fine |
+| Nuitka | AGPL-3 | avoid; weaker yt-dlp support |
+
+Decision: **`GPL-3.0-or-later`** — the only option simultaneously valid with mutagen, Qt
+and yt-dlp. Accepting redistribution is the cost. Alternative: drop `mutagen`
+(`ui/pages/media_page.py:57-59`) and keep a permissive license.
+
+### 7.3 Blockers (crash or visible failure for a stranger)
+
+**B1. Relative paths — crash before a window exists**
+
+- `logger.py:7-8` creates `logs/` at import time; `main.py:6` imports it.
+- `config.py:3-5` — `history.json`, `queue.json`, `settings.json` are bare filenames.
+- Installed under `/Applications`, `C:\Program Files`, AppImage root: `PermissionError`
+  before `QApplication`, and no log to explain it.
+- Fix: resolve one data root (stdlib per-platform logic, or `platformdirs`), use absolute
+  paths everywhere. Note `platformdirs` latest needs **Python ≥3.11** while `README.md:85`
+  and `pyproject.toml:4` say 3.10 — raise the floor or hand-roll ~20 lines.
+
+**B2. Bundled assets are cwd-relative**
+
+- `ui/pages/media_page.py:246` — `QPixmap("assets/video.png")`; in a frozen app the cwd is
+  arbitrary and the file lives in `_MEIPASS`. Fails silently (`isNull()` → empty pixmap).
+- Fix: one `resource_path()` helper (`sys._MEIPASS` when frozen) or `importlib.resources`,
+  and ship `assets` as spec `datas`.
+
+**B3. Font not shipped**
+
+- `ui/theme.py:174-175` — `Monocraft` with `monospace` fallback; no
+  `QFontDatabase.addApplicationFont` anywhere. The `ui_scale` metrics were tuned around
+  this font, so strangers get a different-looking app.
+- Fix: bundle the regular weight, register in `main.py` before `apply_theme`, ship OFL.
+
+**B4. Media binaries and cookie backends missing**
+
+- `downloader.py:158` (`FFmpegExtractAudio`), `downloader.py:167`
+  (`merge_output_format: mp4`) need system ffmpeg.
+- `downloader.py:52-57` `cookiesfrombrowser` needs `secretstorage` for Chromium on Linux —
+  confirmed missing at `yt_dlp/dependencies/__init__.py:32-41`, so that path is already
+  broken here.
+- `yt_dlp_ejs` absent (`yt_dlp/dependencies/__init__.py:85-87`); metadata extraction still
+  worked in a live probe (53 formats), but JS-challenged formats may not.
+- Fix: `yt-dlp[default]==<pin>` + `secretstorage; sys_platform == "linux"`, bundle ffmpeg
+  and pass `ffmpeg_location`, detect at startup and disable audio-only with an explanation.
+
+**B5. No single-instance guard**
+
+`persistence.py:26` lock is process-local; a second launch double-clicks into a race on
+`queue.json` (written on every transition) → lost rows, duplicate downloads. Add
+`QLockFile` in the data dir and focus the running window.
+
+**B6. No icon, desktop entry, or version**
+
+`ui/main_window.py:42` sets only a title. No `setWindowIcon`, `.ico`/`.icns`, `.desktop`,
+`setApplicationVersion`, or `setDesktopFileName` → generic Python icon in dock/taskbar,
+no Linux launcher entry, unidentifiable process. Ship icons per platform, a `.desktop` +
+AppStream XML, and one `__version__` read by pyproject and an About dialog (GPL text and
+source link belong there).
+
+### 7.4 Dependency correctness ("works on my machine")
+
+- `requirements.txt:3` — `PySide6>=6.12.0` pulls the Addons metapackage, hence WebEngine's
+  400+ MB. The app imports only Core/Gui/Widgets: use `PySide6-Essentials==6.12.0`.
+- `requirements.txt:1` — exact pin `2026.3.17` while `2026.8.19` is installed. No lock,
+  no hashes. Add a lock and one source of truth for the engine version.
+- yt-dlp ships its own PyInstaller hook (`yt_dlp/__pyinstaller/hook-yt_dlp.py`) registered
+  through a `pyinstaller40` entry point; it already collects `websockets`, `requests`,
+  `urllib3`, `mutagen`, `brotli`, `certifi`, `secretstorage`, `curl_cffi` and the
+  `yt_dlp_ejs` payloads. Install the extras; do not hand-maintain `hiddenimports`.
+- Add `platformdirs` (or equivalent) and `secretstorage` to the dependency set.
+
+### 7.5 Packaging
+
+- Tool: **PyInstaller 6.22.x**. yt-dlp maintains a hook for it; Nuitka is AGPL-3 with a
+  less predictable yt-dlp path.
+- Shape: **one-dir**, not one-file (one-file re-extracts ~200 MB per launch, trips
+  antivirus, and breaks `.part` resume when temp is cleared).
+- Size: Essentials-only ≈ 120–180 MB; with a static ffmpeg ≈ 200–260 MB. Exclude
+  `QtWebEngine*`, `QtQml`, `QtQuick`, `Qt3D*`, `QtDesigner`, `QtCharts`, `QtMultimedia`,
+  `PySide6.scripts`, unused translations. Verify with a size report after the first build.
+- Linux: AppImage (`.desktop`, icon, AppRun) + `tar.gz` + SHA256. Flatpak only if
+  sandboxing is worth the cookie/file-access friction.
+- Windows: per-user Inno Setup installer under `%LOCALAPPDATA%` + portable zip. Unsigned
+  builds warn in SmartScreen; an OV/EV cert (hardware token) is the only fix.
+- macOS: `.app` in a `.dmg`, Developer ID signed + notarized (hardened runtime). Requires
+  the Apple Developer Program. Keys live in CI secrets, never in the repo.
+- Frozen hazards to test: SSL without `certifi`, Qt platform plugin (`xcb`) on minimal
+  Linux, and the `os.startfile`/`open`/`xdg-open` branches (`media_page.py:285-291`,
+  `queue_page.py:606-612`) which have never run on Windows/macOS here.
+- CI builds on all three OSes; PyInstaller cannot cross-compile.
+
+### 7.6 Engine updates
+
+- `downloader.py:1` imports `yt_dlp` at module scope and `main.py` imports it
+  transitively, so any `sys.path` override must happen in `main.py` **first**.
+- `yt_dlp.update` only works for frozen single binaries (`is_non_updateable`), so it cannot
+  update a bundled package.
+- Workable design: bundled baseline → read `user_data_dir/engine/current.json` → prepend a
+  newer verified wheel dir to `sys.path` → update by downloading the `py3-none-any` wheel
+  from `https://pypi.org/pypi/yt-dlp/json`, verifying its SHA256 from the same response,
+  unpacking into `engine/<version>/`, atomically rewriting `current.json`, and falling back
+  to the bundled copy if import fails.
+- Must be proven at build time: whether PyInstaller's frozen importer yields to a runtime
+  `sys.path` prepend. Test with two deliberately different versions before building UX.
+- Rejected alternative: execing a yt-dlp binary — loses the info dict that feeds
+  thumbnails and `info_callback` (`queue_page.py:650`).
+
+### 7.7 Privacy and public-repo surface
+
+- `downloader.py:71,82,171,175,183,189,201,213` log full URLs → watch history in
+  `logs/app.log`. Fine locally; redact paths/queries and the home dir in any diagnostics
+  export.
+- `settings.json` stores `cookie_file_path` and the browser name: never log, never include
+  in diagnostics.
+- Keep no telemetry, or make it opt-in with a visible switch.
+- Any auto-update must verify hashes/signatures; unsigned updates are RCE by design.
+- Add `SECURITY.md` — the app touches browser cookies, so a disclosure address is expected.
+
+### 7.8 Correctness a stranger notices in hour one
+
+- Storage meter is dead: `ui/sidebar.py:209` `set_storage()` has no callers; the sidebar
+  always shows `0 GB` (`sidebar.py:139`). Wire `shutil.disk_usage` or delete the widget.
+- `ui/main_window.py:44-53` clamps the minimum to 90% of the screen but requests
+  `px(1200)×px(700)` = 1800×1050 at scale 1.5. On 1366×768 that overflows horizontally.
+  Test 1280×720; consider picking the initial scale from the screen.
+- First run has `download_path: ""` (`config.py:16`) and `add_to_queue` refuses with a
+  dialog (`queue_page.py:513-516`): a stranger's first click fails. Add onboarding:
+  folder, scale, audio default.
+- No `sys.excepthook` — a Qt slot exception vanishes into a windowed build's stderr. Add a
+  handler that logs and offers "copy diagnostics".
+
+### 7.9 Tests and CI
+
+- Existing 36 tests cover `queue_manager`, `persistence`, `theme`, `thumb_cache` only; no
+  coverage of `QueueRunner` cancellation or any Qt page.
+- CI on 3.11–3.13: ruff + unittest, plus an offscreen (`QT_QPA_PLATFORM=offscreen`) GUI
+  smoke test (nav, add with stubbed downloader, theme switch, settings save).
+- Build job per OS must at least launch the produced binary offscreen so a missing Qt
+  plugin fails CI instead of users.
+
+### 7.10 Plan
+
+| Phase | Scope | Effort |
+|-------|-------|--------|
+| 10 | B1 data dirs + migration, B2 resources, B3 font, B4 ffmpeg/extras, B5 single instance, B6 icon/version, storage meter, excepthook, onboarding | 4–6 d |
+| 11 | GPL-3 + `THIRD_PARTY_NOTICES.md` (Tabler, OFL, Qt, yt-dlp, mutagen, ffmpeg), CI matrix, issue/PR templates | 1–2 d |
+| 12 | Engine update path (design + frozen-importer proof) | 2–4 d |
+| 13 | PyInstaller specs, icons, `.desktop`, AppImage/Inno/dmg, signing, release workflow | 5–8 d |
+| 14 | First public release: docs, screenshots, support policy | 1–2 d |
+
+Critical path: **10 before 13** — packaging a relative-path app ships a binary that
+crashes on launch for everyone but the author.
+
+### 7.11 Open decisions
+
+1. License: accept GPL-3, or drop `mutagen` to stay permissive? (blocks 11)
+2. Target platforms and order — Windows adds signing cost, macOS adds $99/yr + notarization.
+3. Distribution channel: GitHub Releases only, or Flathub/AUR/Homebrew cask too?
+4. Engine updates: runtime wheel swap (fast, more moving parts) vs app releases only?
+5. Whether PyInstaller's frozen importer yields to a prepended `sys.path` — measure it.
