@@ -87,6 +87,8 @@ def load_settings() -> dict:
         return merged
     merged = dict(DEFAULT_SETTINGS)
     merged.update(data)
+    if not merged.get("download_path"):
+        merged["download_path"] = DEFAULT_SETTINGS["download_path"]
     return merged
 
 

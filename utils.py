@@ -1,7 +1,14 @@
 import json
 import os
+import sys
 
 from config import DEFAULT_SETTINGS, HISTORY_FILE, QUEUE_FILE, SETTINGS_FILE
+
+
+def resource_path(relative: str) -> str:
+    """Absolute path to a bundled resource, from source or a frozen build."""
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, relative)
 
 
 def save_history(data):
@@ -58,7 +65,6 @@ def save_settings(settings):
 def detect_vlc():
     """Auto-detect VLC executable path"""
     import subprocess
-    import sys
 
     common_paths = []
 

@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 
 import thumb_cache
 from ui.theme import METRICS, px
+from utils import resource_path
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +243,8 @@ class MediaBrowser(QWidget):
                 pixmap = QPixmap(thumb)
                 if not pixmap.isNull():
                     return pixmap.scaled(160, 90, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-        asset = "assets/video.png" if self.kind == "video" else "assets/music.png"
+        name = "assets/video.png" if self.kind == "video" else "assets/music.png"
+        asset = resource_path(name)
         pixmap = QPixmap(asset)
         return pixmap.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation) if not pixmap.isNull() else QPixmap()
 

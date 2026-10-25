@@ -8,6 +8,7 @@ DEFAULT_PATH = ""
 
 APP_DIR_NAME = "Video-Downloader"
 LEGACY_FILES = ("history.json", "queue.json", "settings.json")
+DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads")
 
 
 def _default_data_dir() -> str:
@@ -60,7 +61,7 @@ DEFAULT_SETTINGS = {
     "clipboard_interval": 3000,
     "default_resolution": "720",
     "default_audio_only": False,
-    "download_path": "",
+    "download_path": DEFAULT_DOWNLOAD_DIR,
     "cookie_method": "none",  # Options: "none", "browser", "file"
     "cookie_browser": "chrome",  # Options: "chrome", "firefox", "edge", "brave", "opera", "safari"
     "cookie_file_path": "",  # Path to cookies.txt file

@@ -83,6 +83,13 @@ class SettingsPersistenceTests(PersistenceTestBase):
         self.assertEqual(settings["theme"], "light")   # user value wins
         self.assertEqual(settings["parallel_limit"], 2)  # default filled in
 
+    def test_blank_download_path_falls_back_to_the_default(self):
+        Path(self.settings_file).write_text('{"download_path": ""}', encoding="utf-8")
+        settings = persistence.load_settings()
+        self.assertEqual(settings["download_path"],
+                         config.DEFAULT_SETTINGS["download_path"])
+        self.assertTrue(settings["download_path"])
+
     def test_defaults_written_when_file_absent(self):
         settings = persistence.load_settings()
         self.assertTrue(Path(self.settings_file).exists())
