@@ -332,13 +332,9 @@ class QueuePage(QWidget):
         outer.addWidget(scroll)
         container = QWidget()
         scroll.setWidget(container)
-        center = QHBoxLayout(container)
-        center.setContentsMargins(0, 0, 0, 0)
-        inner = QWidget()
-        inner.setMaximumWidth(px(980))
-        inner.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        center.addWidget(inner, 1, Qt.AlignHCenter)
-        col = QVBoxLayout(inner)
+        # Fluid like the Videos/Music/Settings pages: the column fills the
+        # viewport instead of a fixed content width, and long text elides.
+        col = QVBoxLayout(container)
         col.setContentsMargins(px(24), px(20), px(24), px(20))
         col.setSpacing(px(16))
 
