@@ -22,3 +22,7 @@
 - Queue per-item *prioritize* (move up/down) was a Tk feature; not ported.
 - `settings.json` theme value: restore to the user's value if any test toggles theme (toggles persist; `set_theme` writes the file).
 - QSS token resolution: a *query* helper (`tokens`, `stylesheet`, `color`) must read the active `_state`. Resolving against module defaults instead makes every family render the default palette — that exact bug shipped once and was only caught by comparing rendered PNGs.
+
+- **Window minimums are device pixels, not design pixels** (`ui/main_window.py`). Scaling them forced 1350x900 at `ui_scale=1.5` and clipped queue rows on a 1366 laptop. Initial size clamps to the available screen, so a large scale no longer pushes the window off-screen.
+- **Queue content is capped at 980 design px** (`ui/pages/queue_page.py`) and centred; labels that carry user text use `ElidedLabel` (middle elision + tooltip) because a plain `QLabel` sets its full text width as the layout minimum.
+- **Inline validation is text, not colour** — `QueuePage._set_validity` writes a message under the URL field and mirrors it into `accessibleDescription`.
