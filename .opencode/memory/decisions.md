@@ -24,7 +24,7 @@
 - QSS token resolution: a *query* helper (`tokens`, `stylesheet`, `color`) must read the active `_state`. Resolving against module defaults instead makes every family render the default palette — that exact bug shipped once and was only caught by comparing rendered PNGs.
 
 - **Window minimums are device pixels, not design pixels** (`ui/main_window.py`). Scaling them forced 1350x900 at `ui_scale=1.5` and clipped queue rows on a 1366 laptop. Initial size clamps to the available screen, so a large scale no longer pushes the window off-screen.
-- **Queue content is capped at 980 design px** (`ui/pages/queue_page.py`) and centred; labels that carry user text use `ElidedLabel` (middle elision + tooltip) because a plain `QLabel` sets its full text width as the layout minimum.
+- **Queue content is fluid**, not capped; `ElidedLabel` (middle elision + tooltip) keeps long user text from setting a huge layout minimum. Labels that carry user text must elide rather than wrap.
 - **Inline validation is text, not colour** — `QueuePage._set_validity` writes a message under the URL field and mirrors it into `accessibleDescription`.
 
 - **One per-user data dir** (`config.DATA_DIR`): Linux `$XDG_DATA_HOME/video-downloader`, macOS `~/Library/Application Support/Video-Downloader`, Windows `%APPDATA%\Video-Downloader`. All state (`queue.json`, `history.json`, `settings.json`), `logs/` and `app.lock` resolve from it at import time — tests still override the module constants, but nothing is written to the repo anymore. `VIDEO_DOWNLOADER_DATA_DIR` overrides it. `config.migrate_legacy_files()` copies legacy cwd JSON once and never overwrites.
@@ -36,3 +36,7 @@
 - **Queue feedback is a banner, not a dialog**: `QueuePage._notify(text, level)` writes to `self.banner` under the input card, auto-hides after 8 s, and is dismissible. `QMessageBox` stays only for decisions (duplicate URL / previously downloaded). Do not add routine `information()`/`warning()` calls back.
 - **`DownloadItem.message` / `.filename`** are persisted optional keys: `message` is the failure reason rendered on the row, `filename` is the yt-dlp final name used by Play. `_set_status(PENDING)` clears `message`; retry reuses the pause/resume path.
 - **Queue rows say "Remove"** with a tooltip that the file is kept; the trash icon belongs to the media library only.
+
+- **One icon source** = `ui/icons.py` (`pixmap`/`icon`). The PNGs in `assets/` are solid black, so they are re-tinted with a theme token and cached per `(name, pixels, hex)`; callers pass a token name, never a raw colour. No text glyphs as affordances. Theme switches must re-tint: `MainWindow.set_theme` calls `sidebar.refresh_icons()`; checked nav rows use `bg_dark`, unchecked `text`.
+- **Preview size estimate** (`queue_page.RESOLUTION_KBPS`) is a deliberate rough table (kbps per resolution + 128 kbps audio); audio-only uses `AUDIO_KBPS = 192`. It is labelled as an estimate (`~`), never presented as exact.
+- **Empty sections hide their heading**; `QueuePage._empty_state()` is the only empty block (icon + one line + "Add a link").
