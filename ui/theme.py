@@ -29,7 +29,7 @@ THEMES: dict[str, dict[str, dict[str, str]]] = {
             "border": "#2a1f3a",
             "text": "#f8f2ff",
             "text_2": "#c9c3d4",
-            "muted": "#6b5b7e",
+            "muted": "#9284a6",
             "gray_light": "#8a7f9a",
             "accent": "#ff79c6",
             "accent_dim": "#e35aa5",
@@ -51,15 +51,15 @@ THEMES: dict[str, dict[str, dict[str, str]]] = {
             "border": "#d9cfe6",
             "text": "#2a1e33",
             "text_2": "#6b5b7e",
-            "muted": "#8a7f9a",
+            "muted": "#6b5b7e",
             "gray_light": "#6b5b7e",
-            "accent": "#c1549c",
-            "accent_dim": "#a83e80",
-            "info": "#7a5bbf",
-            "success": "#3ec96a",
-            "error": "#e34c4c",
-            "warning": "#e8833c",
-            "paused": "#c9a227",
+            "accent": "#9c3676",
+            "accent_dim": "#83305f",
+            "info": "#6a3fb5",
+            "success": "#1a7f37",
+            "error": "#b42323",
+            "warning": "#9a5410",
+            "paused": "#7a5c00",
             "track": "#d9cfe6",
         },
     },
@@ -99,8 +99,8 @@ THEMES: dict[str, dict[str, dict[str, str]]] = {
             "border": "#d3dced",
             "text": "#0f172a",
             "text_2": "#475569",
-            "muted": "#64748b",
-            "gray_light": "#64748b",
+            "muted": "#5b6a7d",
+            "gray_light": "#5b6a7d",
             "accent": "#2563eb",
             "accent_dim": "#1d4ed8",
             "info": "#2563eb",
@@ -255,11 +255,12 @@ _state = {"scale": BASE_UI_SCALE, "family": DEFAULT_FAMILY, "mode": DEFAULT_MODE
 # ``$name`` is a colour token from :data:`THEMES`. Hairline borders stay 1px.
 _QSS_RAW = """
     QWidget {
-        background: $bg;
         color: $text;
         font-size: $size;
     }
-    QMainWindow, #Content { background: $bg; }
+    QMainWindow, #Content, QStackedWidget, QScrollArea { background: $bg; }
+    QScrollArea > QWidget > QWidget { background: transparent; }
+    QLabel, QCheckBox { background: transparent; }
 
     /* ---------- sidebar ---------- */
     #Sidebar { background: $sidebar; border-right: 1px solid $border; }
@@ -311,17 +312,25 @@ _QSS_RAW = """
         font-size: @{12}px;
     }
     QPushButton:hover { background: $hover; }
-    QPushButton:focus { border: 1px solid $accent; }
+    QPushButton:focus { border: 2px solid $accent; padding: @{6}px @{13}px; }
     QPushButton:disabled { color: $muted; background: $bg; }
+    QPushButton#NavButton:focus { border: 1px solid $accent; }
     QPushButton#PrimaryButton {
         background: $accent; color: $bg_dark;
         border-color: transparent; font-weight: 600;
     }
     QPushButton#PrimaryButton:hover { background: $accent_dim; }
+    QPushButton#PrimaryButton:focus { border: 2px solid $text; }
+    QPushButton#PrimaryButton:disabled {
+        background: $bg; color: $muted; border-color: $border;
+    }
     QPushButton#DangerButton {
         background: transparent; color: $error; border-color: $error;
     }
     QPushButton#DangerButton:hover { background: $card; }
+    QPushButton#DangerButton:disabled {
+        background: transparent; color: $muted; border-color: $border;
+    }
 
     /* ---------- inputs ---------- */
     QLineEdit {
@@ -348,8 +357,7 @@ _QSS_RAW = """
         background: $card; border: 1px solid $border; border-radius: @{10}px;
     }
     QStackedWidget { background: transparent; }
-    QScrollArea { background: transparent; border: 0; }
-    QScrollArea > QWidget > QWidget { background: transparent; }
+    QScrollArea { border: 0; }
     #FieldLabel {
         font-size: @{10}px; letter-spacing: @{1}px; color: $muted;
     }
@@ -364,6 +372,9 @@ _QSS_RAW = """
     QPushButton#Pill:hover { background: $hover; }
     QPushButton#Pill:checked {
         border-color: $accent; color: $accent; background: $hover;
+    }
+    QPushButton#Pill:disabled {
+        border-color: $border; color: $muted; background: $bg;
     }
     #Chip {
         background: $card; border: 1px solid $border; border-radius: @{4}px;
@@ -382,6 +393,7 @@ _QSS_RAW = """
 
     /* ---------- media lists ---------- */
     QListWidget { background: transparent; border: 0; outline: 0; }
+    QListWidget:focus { border: 1px solid $accent; }
     QListWidget::item { color: $text; padding: @{6}px; border-radius: @{6}px; }
     QListWidget::item:selected { background: $hover; color: $text; }
     #StatusLine { color: $gray_light; font-size: @{11}px; }
