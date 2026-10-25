@@ -40,3 +40,5 @@
 - **One icon source** = `ui/icons.py` (`pixmap`/`icon`). The PNGs in `assets/` are solid black, so they are re-tinted with a theme token and cached per `(name, pixels, hex)`; callers pass a token name, never a raw colour. No text glyphs as affordances. Theme switches must re-tint: `MainWindow.set_theme` calls `sidebar.refresh_icons()`; checked nav rows use `bg_dark`, unchecked `text`.
 - **Preview size estimate** (`queue_page.RESOLUTION_KBPS`) is a deliberate rough table (kbps per resolution + 128 kbps audio); audio-only uses `AUDIO_KBPS = 192`. It is labelled as an estimate (`~`), never presented as exact.
 - **Empty sections hide their heading**; `QueuePage._empty_state()` is the only empty block (icon + one line + "Add a link").
+
+- **Source of truth for icon art is Tabler Icons outline** (`https://tabler.io/icons`, SVG from `tabler/tabler-icons`). `assets/*.png` are those SVGs rendered 240x240, solid black on transparent; `ui/icons.py` does the tinting. Add a new icon by rendering its outline SVG the same way, never by shipping a coloured bitmap.

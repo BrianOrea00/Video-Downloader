@@ -270,8 +270,8 @@ class QueueRow(QFrame):
         actions.addWidget(self._icon_button(
             "folder", "Open folder", lambda: self.open_folder.emit(self.item)))
         if item.status is DownloadStatus.DOWNLOADING:
-            actions.addWidget(self._text_button(
-                "Cancel", "Cancel this download", lambda: self.cancel.emit(self.item)))
+            actions.addWidget(self._icon_button(
+                "x", "Cancel this download", lambda: self.cancel.emit(self.item)))
         if item.status is DownloadStatus.PAUSED:
             actions.addWidget(self._text_button(
                 "Resume", "Resume download", lambda: self.resume.emit(self.item)))
@@ -541,6 +541,8 @@ class QueuePage(QWidget):
         self.start_btn.clicked.connect(self.start)
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setObjectName("DangerButton")
+        self.stop_btn.setIcon(icons.icon("player-pause", 16, "error"))
+        self.stop_btn.setIconSize(QSize(px(16), px(16)))
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop)
         clear_btn = QPushButton("Clear Completed")
