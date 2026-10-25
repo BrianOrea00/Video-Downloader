@@ -37,6 +37,7 @@ from queue_runner import QueueRunner
 from ui import theme as ui_theme
 from ui.theme import METRICS, px
 from url_validator import validate_url
+from utils import ffmpeg_available
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +430,15 @@ class QueuePage(QWidget):
         self.audio_pill.setObjectName("Pill")
         self.audio_pill.setCheckable(True)
         self.audio_pill.setCursor(Qt.PointingHandCursor)
-        self.audio_pill.setChecked(bool(self.settings.get("default_audio_only", False)))
+        self._ffmpeg = ffmpeg_available()
+        self.audio_pill.setChecked(
+            self._ffmpeg and bool(self.settings.get("default_audio_only", False))
+        )
+        if not self._ffmpeg:
+            self.audio_pill.setEnabled(False)
+            self.audio_pill.setToolTip(
+                "ffmpeg was not found on PATH. Audio-only and MP4 merging need it."
+            )
         path_row.addWidget(self.audio_pill)
         browse = QPushButton("Browse")
         browse.clicked.connect(self.browse)
@@ -516,7 +525,9 @@ class QueuePage(QWidget):
         res = self.settings.get("default_resolution", "720")
         if res in self._res_buttons:
             self.set_resolution(res)
-        self.audio_pill.setChecked(bool(self.settings.get("default_audio_only", False)))
+        self.audio_pill.setChecked(
+            self._ffmpeg and bool(self.settings.get("default_audio_only", False))
+        )
 
     def paste(self) -> None:
         from PySide6.QtWidgets import QApplication
@@ -651,6 +662,13 @@ class QueuePage(QWidget):
         path = self.settings.get("download_path") or ""
         if not path:
             QMessageBox.warning(self, "Missing folder", "Please select a download folder.")
+            return
+        if self.audio_pill.isChecked() and not self._ffmpeg:
+            QMessageBox.warning(
+                self, "ffmpeg missing",
+                "Audio-only downloads need ffmpeg on your PATH.\n\n"
+                "Install ffmpeg, or clear the Audio Only pill to download video.",
+            )
             return
 
         duplicate_kind, duplicate = self.manager.find_duplicate(url)

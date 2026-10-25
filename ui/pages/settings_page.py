@@ -35,6 +35,7 @@ from ui.theme import (
     family_names,
     px,
 )
+from utils import ffmpeg_available
 
 logger = logging.getLogger(__name__)
 
@@ -154,9 +155,18 @@ class SettingsPage(QWidget):
 
         self.audio_only = QCheckBox("Enabled")
         self.audio_only.setAccessibleName("Download audio (MP3) by default")
-        self.audio_only.setChecked(bool(self.settings.get("default_audio_only", False)))
+        ffmpeg_ok = ffmpeg_available()
+        audio_help = "Default format for new items."
+        if not ffmpeg_ok:
+            audio_help = "Needs ffmpeg on PATH; it was not found."
+            self.audio_only.setEnabled(False)
+            self.audio_only.setToolTip(audio_help)
+            self.audio_only.setAccessibleDescription(audio_help)
+        self.audio_only.setChecked(
+            ffmpeg_ok and bool(self.settings.get("default_audio_only", False))
+        )
         self.audio_only.toggled.connect(lambda v: self._set("default_audio_only", v))
-        form.addRow(self._label("Audio only", "Default format for new items."), self.audio_only)
+        form.addRow(self._label("Audio only", audio_help), self.audio_only)
         return card
 
     def _general_card(self) -> QFrame:

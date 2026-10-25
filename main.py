@@ -13,10 +13,36 @@ from ui.main_window import MainWindow
 from ui.theme import DEFAULT_FAMILY, DEFAULT_MODE, DEFAULT_UI_SCALE, apply_theme, set_ui_scale
 
 
+def _install_excepthook() -> None:
+    """Log uncaught exceptions and surface them instead of dying silently.
+
+    A windowed build has no visible stderr, so a Qt slot exception would
+    otherwise just close or freeze the app with no trace for the user.
+    """
+
+    def handle(exc_type, exc, tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        logger.critical("Unhandled exception", exc_info=(exc_type, exc, tb))
+        try:
+            QMessageBox.critical(
+                None,
+                "Video Downloader",
+                f"Something went wrong:\n\n{exc}\n\n"
+                "Details were written to the application log.",
+            )
+        except Exception:  # noqa: BLE001 - never recurse inside the hook
+            pass
+
+    sys.excepthook = handle
+
+
 def main() -> int:
     logger.info("Starting Video Downloader")
     app = QApplication(sys.argv)
     app.setApplicationName("Video Downloader")
+    _install_excepthook()
 
     # One process per user data directory: two instances would race the
     # queue file and can download the same item twice.

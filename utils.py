@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import sys
 
 from config import DEFAULT_SETTINGS, HISTORY_FILE, QUEUE_FILE, SETTINGS_FILE
@@ -9,6 +10,15 @@ def resource_path(relative: str) -> str:
     """Absolute path to a bundled resource, from source or a frozen build."""
     base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, relative)
+
+
+def ffmpeg_available() -> bool:
+    """True when an ffmpeg binary is on PATH.
+
+    Audio extraction and MP4 merging both fail without it, so the UI disables
+    those choices instead of letting a download fail later.
+    """
+    return shutil.which("ffmpeg") is not None
 
 
 def save_history(data):
