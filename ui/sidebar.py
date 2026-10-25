@@ -2,7 +2,7 @@
 """Sidebar navigation: logo, nav buttons, storage meter."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -13,20 +13,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import icons
 from ui.theme import METRICS, px, repolish
 
-# (page key, glyph, label)
+# (page key, icon asset, label)
 NAV_ITEMS = [
-    ("queue", "\u2b07", "Queue"),
-    ("videos", "\u25b6", "Videos"),
-    ("music", "\u266a", "Music"),
+    ("queue", "download", "Queue"),
+    ("videos", "video", "Videos"),
+    ("music", "music", "Music"),
 ]
 SYSTEM_ITEMS = [
-    ("settings", "\u2699", "Settings"),
+    ("settings", "settings", "Settings"),
 ]
-
-BURGER_GLYPH = "\u2630"
-
 
 def _section_label(text: str) -> QLabel:
     label = QLabel(text.upper())
@@ -75,7 +73,9 @@ class Sidebar(QWidget):
         layout.setContentsMargins(px(4), 0, px(4), px(12))
         layout.setSpacing(px(8))
 
-        self.burger = QPushButton(BURGER_GLYPH)
+        self.burger = QPushButton()
+        self.burger.setIcon(icons.icon("list-details", 18, "gray_light"))
+        self.burger.setIconSize(QSize(px(18), px(18)))
         self.burger.setObjectName("BurgerButton")
         self.burger.setCheckable(True)
         self.burger.setCursor(Qt.PointingHandCursor)
@@ -83,10 +83,11 @@ class Sidebar(QWidget):
         self.burger.setAccessibleName("Collapse sidebar")
         self.burger.clicked.connect(self.toggle_collapsed)
 
-        self._mark = QLabel("\u25bc")
+        self._mark = QLabel()
         self._mark.setObjectName("LogoMark")
         self._mark.setFixedSize(px(METRICS["logo_mark"]), px(METRICS["logo_mark"]))
         self._mark.setAlignment(Qt.AlignCenter)
+        self._mark.setPixmap(icons.pixmap("download", 14, "bg_dark"))
 
         self._logo_text = QWidget()
         text = QVBoxLayout(self._logo_text)
@@ -111,16 +112,18 @@ class Sidebar(QWidget):
         self._sections.append(label)
         return label
 
-    def _add_nav(self, key: str, glyph: str, label: str) -> QPushButton:
+    def _add_nav(self, key: str, asset: str, label: str) -> QPushButton:
+        """``asset`` is an icon name resolved by :mod:`ui.icons`."""
         button = QPushButton()
         button.setObjectName("NavButton")
         button.setCheckable(True)
         button.setCursor(Qt.PointingHandCursor)
         button.setAccessibleName(label)
         button.clicked.connect(lambda _=False, k=key: self.navigate.emit(k))
+        button.toggled.connect(lambda _=False, k=key: self._paint_nav(k))
         self._group.addButton(button)
         self._buttons[key] = button
-        self._items[key] = (glyph, label)
+        self._items[key] = (asset, label)
         self._paint_nav(key)
         return button
 
@@ -192,15 +195,25 @@ class Sidebar(QWidget):
 
     def _paint_nav(self, key: str) -> None:
         """Render one nav button for the current rail state."""
-        glyph, label = self._items[key]
+        asset, label = self._items[key]
         button = self._buttons[key]
-        button.setText(glyph if self._collapsed else f"{glyph}   {label}")
+        size = 18 if self._collapsed else 16
+        token = "bg_dark" if button.isChecked() else "text"
+        button.setIcon(icons.icon(asset, size, token))
+        button.setIconSize(QSize(px(size), px(size)))
+        button.setText("" if self._collapsed else f"   {label}")
         button.setProperty("collapsed", "true" if self._collapsed else "false")
         # Tooltip only earns its place once the text is gone.
         button.setToolTip("" if not self._collapsed else label)
         repolish(button)
 
     # -- public API --------------------------------------------------------
+    def refresh_icons(self) -> None:
+        """Re-tint icons after a theme switch (the PNGs are black)."""
+        self.burger.setIcon(icons.icon("list-details", 18, "gray_light"))
+        for key in self._buttons:
+            self._paint_nav(key)
+
     def set_active(self, key: str) -> None:
         button = self._buttons.get(key)
         if button is not None and not button.isChecked():

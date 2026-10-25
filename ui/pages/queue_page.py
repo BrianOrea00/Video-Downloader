@@ -10,7 +10,7 @@ import logging
 import os
 from urllib.parse import urlparse
 
-from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtCore import QSize, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -35,6 +35,7 @@ from models import DownloadItem, DownloadStatus
 from persistence import save_history
 from queue_manager import QueueManager
 from queue_runner import QueueRunner
+from ui import icons
 from ui import theme as ui_theme
 from ui.theme import METRICS, px
 from url_validator import validate_url
@@ -49,6 +50,13 @@ STATUS_META = {
     DownloadStatus.COMPLETED: ("Completed", "success"),
     DownloadStatus.FAILED: ("Failed", "error"),
 }
+# Rough video bitrate per resolution (kbps) for the "Will download" estimate.
+RESOLUTION_KBPS = {
+    "144": 120, "240": 300, "360": 600,
+    "480": 1200, "720": 2500, "1080": 4500,
+}
+AUDIO_KBPS = 192
+AUDIO_TRACK_KBPS = 128
 STATUS_ORDER = {
     DownloadStatus.PENDING: 0,
     DownloadStatus.PAUSED: 1,
@@ -204,7 +212,11 @@ class QueueRow(QFrame):
         row.setContentsMargins(px(12), px(10), px(12), px(10))
         row.setSpacing(px(12))
 
-        tile = QLabel("\u266a" if item.audio_only else "\u25bc")
+        tile = QLabel()
+        tile.setPixmap(icons.pixmap(
+            "music" if item.audio_only else "video", 16,
+            "muted" if item.status is DownloadStatus.COMPLETED else "gray_light",
+        ))
         tile.setObjectName("RowTile")
         tile.setFixedSize(px(METRICS["row_tile_w"]), px(METRICS["row_tile_h"]))
         tile.setAlignment(Qt.AlignCenter)
@@ -256,13 +268,13 @@ class QueueRow(QFrame):
             actions.addWidget(self._text_button(
                 "Play", "Play file", lambda: self.play.emit(self.item)))
         actions.addWidget(self._icon_button(
-            "\U0001f4c1", "Open folder", lambda: self.open_folder.emit(self.item)))
+            "folder", "Open folder", lambda: self.open_folder.emit(self.item)))
         if item.status is DownloadStatus.DOWNLOADING:
-            actions.addWidget(self._icon_button(
-                "\u2715", "Cancel", lambda: self.cancel.emit(self.item)))
+            actions.addWidget(self._text_button(
+                "Cancel", "Cancel this download", lambda: self.cancel.emit(self.item)))
         if item.status is DownloadStatus.PAUSED:
-            actions.addWidget(self._icon_button(
-                "\u21bb", "Resume", lambda: self.resume.emit(self.item)))
+            actions.addWidget(self._text_button(
+                "Resume", "Resume download", lambda: self.resume.emit(self.item)))
         if item.status is DownloadStatus.FAILED:
             actions.addWidget(self._text_button(
                 "Retry", "Retry download", lambda: self.resume.emit(self.item)))
@@ -271,8 +283,10 @@ class QueueRow(QFrame):
             lambda: self.remove.emit(self.item)))
         row.addLayout(actions)
 
-    def _icon_button(self, glyph: str, tip: str, slot) -> QPushButton:
-        button = QPushButton(glyph)
+    def _icon_button(self, asset: str, tip: str, slot) -> QPushButton:
+        button = QPushButton()
+        button.setIcon(icons.icon(asset, 16, "text"))
+        button.setIconSize(QSize(px(16), px(16)))
         button.setFixedSize(px(METRICS["row_action"]), px(METRICS["row_action"]))
         button.setToolTip(tip)
         button.setAccessibleName(tip)
@@ -378,12 +392,14 @@ class QueuePage(QWidget):
         self.chips_row.setSpacing(px(8))
         col.addLayout(self.chips_row)
 
-        col.addWidget(self._section("Active"))
+        self.active_section = self._section("Active")
+        col.addWidget(self.active_section)
         self.active_list = QVBoxLayout()
         self.active_list.setSpacing(px(8))
         col.addLayout(self.active_list)
 
-        col.addWidget(self._section("Queue"))
+        self.queue_section = self._section("Queue")
+        col.addWidget(self.queue_section)
         self.queue_list = QVBoxLayout()
         self.queue_list.setSpacing(px(8))
         col.addLayout(self.queue_list)
@@ -448,10 +464,10 @@ class QueuePage(QWidget):
         paste_btn.clicked.connect(self.paste)
         input_row.addWidget(paste_btn)
 
-        add_btn = QPushButton("Add to Queue")
-        add_btn.setObjectName("PrimaryButton")
-        add_btn.clicked.connect(self.add_to_queue)
-        input_row.addWidget(add_btn)
+        self.add_btn = QPushButton("Add to Queue")
+        self.add_btn.setObjectName("PrimaryButton")
+        self.add_btn.clicked.connect(self.add_to_queue)
+        input_row.addWidget(self.add_btn)
         layout.addLayout(input_row)
 
         self.validity_label = QLabel("")
@@ -492,6 +508,7 @@ class QueuePage(QWidget):
         self.audio_pill.setObjectName("Pill")
         self.audio_pill.setCheckable(True)
         self.audio_pill.setCursor(Qt.PointingHandCursor)
+        self.audio_pill.toggled.connect(lambda _=False: self._update_preview_meta())
         self._ffmpeg = ffmpeg_available()
         self.audio_pill.setChecked(
             self._ffmpeg and bool(self.settings.get("default_audio_only", False))
@@ -508,7 +525,7 @@ class QueuePage(QWidget):
         layout.addLayout(path_row)
 
         self.preview = QFrame()
-        self.preview.setObjectName("Card")
+        self.preview.setObjectName("PreviewCard")
         self.preview.setVisible(False)
         self.preview_layout = QHBoxLayout(self.preview)
         self.preview_layout.setContentsMargins(px(10), px(10), px(10), px(10))
@@ -581,6 +598,7 @@ class QueuePage(QWidget):
         button = self._res_buttons.get(res)
         if button is not None:
             button.setChecked(True)
+        self._update_preview_meta()
 
     def apply_defaults(self) -> None:
         """Re-apply default resolution/audio from settings to the input bar."""
@@ -612,6 +630,7 @@ class QueuePage(QWidget):
     def _fetch_preview(self, url: str) -> None:
         if self._info_worker is not None and self._info_worker.isRunning():
             return
+        self.add_btn.setEnabled(False)
         self._show_preview_state("Fetching video info\u2026")
         cookie_settings = {
             "cookie_method": self.settings.get("cookie_method", "none"),
@@ -623,6 +642,7 @@ class QueuePage(QWidget):
         self._info_worker.start()
 
     def _on_preview_fetched(self, url: str, info) -> None:
+        self.add_btn.setEnabled(True)
         if info is None:
             self._preview_info = None
             self._preview_url = None
@@ -634,10 +654,15 @@ class QueuePage(QWidget):
 
     def _show_preview_state(self, text: str) -> None:
         self._clear_layout(self.preview_layout)
+        spinner = QProgressBar()
+        spinner.setRange(0, 0)   # indeterminate busy indicator
+        spinner.setTextVisible(False)
+        spinner.setFixedWidth(px(60))
+        spinner.setFixedHeight(px(4))
+        self.preview_layout.addWidget(spinner)
         label = QLabel(text)
         label.setStyleSheet(f"color: {ui_theme.color('muted')};")
-        self.preview_layout.addWidget(label)
-        self.preview_layout.addStretch(1)
+        self.preview_layout.addWidget(label, 1)
         self.preview.setVisible(True)
 
     def _show_preview(self, info) -> None:
@@ -645,6 +670,7 @@ class QueuePage(QWidget):
             self._hide_preview()
 
     def _hide_preview(self) -> None:
+        self.add_btn.setEnabled(True)
         self.preview.setVisible(False)
         self._clear_layout(self.preview_layout)
         self._preview_info = None
@@ -654,17 +680,29 @@ class QueuePage(QWidget):
         self._clear_layout(self.preview_layout)
         duration = _fmt_duration(info.get("duration"))
 
-        thumb = QLabel("\u25b6")
+        thumb = QLabel()
         thumb.setObjectName("RowTile")
         thumb.setFixedSize(px(METRICS["row_thumb_w"]), px(METRICS["row_thumb_h"]))
         thumb.setAlignment(Qt.AlignCenter)
-        thumb.setScaledContents(False)
+        thumb.setPixmap(icons.pixmap("player-play", 20, "muted"))
         self.preview_layout.addWidget(thumb)
         self._load_preview_thumb(info, thumb)
+        if duration:
+            badge = QLabel(duration, thumb)
+            badge.setObjectName("Chip")
+            badge.setStyleSheet(
+                f"font-family: {ui_theme.UI_FONT}, monospace;"
+                f"font-size: {ui_theme.px(10)}px; padding: 0 {ui_theme.px(4)}px;"
+            )
+            badge.adjustSize()
+            badge.move(
+                thumb.width() - badge.width() - px(4),
+                thumb.height() - badge.height() - px(4),
+            )
 
         body = QVBoxLayout()
         body.setSpacing(px(4))
-        title = QLabel(info.get("title", "Unknown"))
+        title = ElidedLabel(info.get("title", "Unknown"))
         title.setStyleSheet("font-weight: 600;")
         body.addWidget(title)
         chips = QHBoxLayout()
@@ -672,18 +710,38 @@ class QueuePage(QWidget):
         channel = info.get("uploader") or info.get("channel")
         if channel:
             chips.addWidget(_chip(channel))
-        if duration:
-            chips.addWidget(_chip(duration))
         views = _fmt_views(info.get("view_count"))
         if views:
             chips.addWidget(_chip(views))
-        size = _fmt_size(info.get("filesize_approx") or info.get("filesize"))
-        if size:
-            chips.addWidget(_chip(f"~{size}"))
         chips.addStretch(1)
         body.addLayout(chips)
+
+        self.preview_meta = QLabel("")
+        self.preview_meta.setObjectName("FormHelp")
+        self.preview_meta.setStyleSheet(
+            f"font-family: {ui_theme.UI_FONT}, monospace;"
+            f"font-size: {ui_theme.px(11)}px; color: {ui_theme.color('gray_light')};"
+        )
+        body.addWidget(self.preview_meta)
+        self._update_preview_meta()
+
         self.preview_layout.addLayout(body, 1)
         self.preview.setVisible(True)
+
+    def _update_preview_meta(self) -> None:
+        """State the target format and its rough size from the selected pill."""
+        meta = getattr(self, "preview_meta", None)
+        if meta is None:
+            return
+        seconds = (self._preview_info or {}).get("duration") or 0
+        if self.audio_pill.isChecked():
+            target = "MP3"
+            kbps = AUDIO_KBPS
+        else:
+            target = f"{self._res}p MP4"
+            kbps = RESOLUTION_KBPS.get(self._res, 2500) + AUDIO_TRACK_KBPS
+        size = _fmt_size(seconds * kbps * 1000 / 8) if seconds else ""
+        meta.setText(f"Will download: {target}" + (f" \u00b7 ~{size}" if size else ""))
 
     def _load_preview_thumb(self, info: dict, tile: QLabel) -> None:
         """Fetch the preview thumbnail off-thread and paint it into ``tile``."""
@@ -899,16 +957,39 @@ class QueuePage(QWidget):
         for item in rest:
             self.queue_list.addWidget(self._make_row(item))
 
+        # An empty section is noise: hide its heading along with it.
+        self.active_section.setVisible(bool(active))
+        self.queue_section.setVisible(bool(rest))
+
         if not items:
-            empty = QLabel("No downloads yet \u2014 paste a link above to get started.")
-            empty.setWordWrap(True)
-            empty.setStyleSheet(f"color: {ui_theme.color('muted')};")
-            self.queue_list.addWidget(empty)
+            self.queue_list.addWidget(self._empty_state())
 
         self._update_chips()
         running = self.runner.is_running()
         self.start_btn.setEnabled(not running)
         self.stop_btn.setEnabled(running)
+
+    def _empty_state(self) -> QWidget:
+        box = QFrame()
+        box.setObjectName("Card")
+        layout = QVBoxLayout(box)
+        layout.setContentsMargins(px(16), px(16), px(16), px(16))
+        layout.setSpacing(px(8))
+        icon_label = QLabel()
+        icon_label.setPixmap(icons.pixmap("download", 24, "muted"))
+        layout.addWidget(icon_label)
+        text = QLabel("No downloads yet \u2014 paste a link above to get started.")
+        text.setWordWrap(True)
+        text.setStyleSheet(f"color: {ui_theme.color('muted')};")
+        layout.addWidget(text)
+        add_link = QPushButton("Add a link")
+        add_link.clicked.connect(self._focus_url)
+        layout.addWidget(add_link, 0, Qt.AlignLeft)
+        return box
+
+    def _focus_url(self) -> None:
+        self.url_input.setFocus()
+        self.url_input.selectAll()
 
     def _make_row(self, item: DownloadItem) -> QueueRow:
         row = QueueRow(item)

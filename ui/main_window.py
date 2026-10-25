@@ -2,7 +2,7 @@
 """Application shell: sidebar + top bar + stacked pages."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 import persistence
 from persistence import save_settings
 from queue_manager import QueueManager
+from ui import icons
 from ui.pages.music_page import MusicPage
 from ui.pages.queue_page import QueuePage
 from ui.pages.settings_page import SettingsPage
@@ -171,20 +172,20 @@ class MainWindow(QMainWindow):
         self.settings_page.sync_theme_controls(self.family, self.mode)
         self._refresh_current()
         self._sync_theme_button()
+        self.sidebar.refresh_icons()
 
     def toggle_theme(self) -> None:
         """Quick toggle: keep the family, flip dark/light."""
         self.set_theme(self.family, flip_mode(self.mode))
 
     def _sync_theme_button(self) -> None:
-        # Label states the action, matching the prototype's "☾ Light".
-        if self.mode == "dark":
-            text = "\u263e Light"
-            hint = "Switch to light mode"
-        else:
-            text = "\u2600 Dark"
-            hint = "Switch to dark mode"
-        self.theme_btn.setText(text)
+        """The label states the action; the icon shows the current mode."""
+        asset = "moon" if self.mode == "dark" else "sun"
+        text = "Light" if self.mode == "dark" else "Dark"
+        hint = "Switch to light mode" if self.mode == "dark" else "Switch to dark mode"
+        self.theme_btn.setIcon(icons.icon(asset, 16, "gray_light"))
+        self.theme_btn.setIconSize(QSize(px(16), px(16)))
+        self.theme_btn.setText(f"  {text}")
         self.theme_btn.setAccessibleName(hint)
 
     # -- badge -------------------------------------------------------------

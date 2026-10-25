@@ -381,6 +381,9 @@ _QSS_RAW = """
         color: $gray_light; padding: @{4}px @{10}px; font-size: @{11}px;
     }
     #Row { background: $card; border: 1px solid $border; border-radius: @{8}px; }
+    #PreviewCard {
+        background: $bg; border: 1px solid $border; border-radius: @{8}px;
+    }
     #RowActive { border: 1px solid $accent; }
     #RowTile {
         background: $bg; border: 1px solid $border; border-radius: @{4}px;

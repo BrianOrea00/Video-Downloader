@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 import thumb_cache
+from ui import icons
 from ui.theme import METRICS, px
 from utils import resource_path
 
@@ -156,7 +157,9 @@ class MediaBrowser(QWidget):
         self.search.textChanged.connect(self._apply_filter)
         header_layout.addWidget(self.search)
 
-        refresh = QPushButton("\u21bb")
+        refresh = QPushButton()
+        refresh.setIcon(icons.icon("refresh", 16, "text"))
+        refresh.setIconSize(QSize(px(16), px(16)))
         refresh.setToolTip("Refresh")
         refresh.setAccessibleName("Refresh")
         refresh.clicked.connect(self.refresh)
