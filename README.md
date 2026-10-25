@@ -70,13 +70,23 @@ video_downloader/
 │       ├── music_page.py     # Music list
 │       └── settings_page.py  # Settings form
 ├── tests/              # unittest suite
-├── history.json        # Download history (auto-created)
-├── queue.json          # Persisted queue (auto-created)
-├── settings.json       # User settings (auto-created)
 ├── assets/             # PNG icons (Tabler icon set)
 ├── requirements.txt
 └── pyproject.toml      # Ruff + pytest configuration
 ```
+
+User state (`queue.json`, `history.json`, `settings.json`, `logs/`, `app.lock`) lives in
+one per-user data directory, never next to the code:
+
+| OS | Path |
+|----|------|
+| Linux | `$XDG_DATA_HOME/video-downloader` (default `~/.local/share/video-downloader`) |
+| macOS | `~/Library/Application Support/Video-Downloader` |
+| Windows | `%APPDATA%\Video-Downloader` |
+
+Set `VIDEO_DOWNLOADER_DATA_DIR` to override it. On first start, any `queue.json`,
+`history.json` or `settings.json` still sitting in the working directory is copied in.
+Only one instance can run per data directory.
 
 ---
 

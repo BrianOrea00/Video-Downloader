@@ -1,8 +1,55 @@
+import os
+import shutil
+import sys
+from pathlib import Path
+
 RESOLUTIONS = ["144", "240", "360", "480", "720", "1080"]
 DEFAULT_PATH = ""
-HISTORY_FILE = "history.json"
-QUEUE_FILE = "queue.json"
-SETTINGS_FILE = "settings.json"
+
+APP_DIR_NAME = "Video-Downloader"
+LEGACY_FILES = ("history.json", "queue.json", "settings.json")
+
+
+def _default_data_dir() -> str:
+    """Per-user data directory, so the app never writes next to its binary."""
+    override = os.environ.get("VIDEO_DOWNLOADER_DATA_DIR")
+    if override:
+        return str(Path(override).expanduser())
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        return str(Path(base) / APP_DIR_NAME)
+    if sys.platform == "darwin":
+        return str(Path.home() / "Library" / "Application Support" / APP_DIR_NAME)
+    base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    return str(Path(base) / "video-downloader")
+
+
+DATA_DIR = _default_data_dir()
+LOG_DIR = os.path.join(DATA_DIR, "logs")
+HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
+QUEUE_FILE = os.path.join(DATA_DIR, "queue.json")
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+
+
+def migrate_legacy_files(directory: str = "") -> list[str]:
+    """Copy any cwd-era JSON state into the data directory.
+
+    Only files that are missing in ``directory`` are copied, so an existing
+    data directory always wins and repeated starts are a no-op.
+    """
+    target_dir = Path(directory or DATA_DIR)
+    migrated: list[str] = []
+    for name in LEGACY_FILES:
+        source = Path(name)
+        target = target_dir / name
+        if source.is_file() and not target.exists():
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            except OSError:
+                continue
+            migrated.append(name)
+    return migrated
 
 DEFAULT_SETTINGS = {
     "theme": "dark",  # Colour mode: "dark" or "light"

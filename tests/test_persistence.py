@@ -1,11 +1,13 @@
 # tests/test_persistence.py
 """Unit tests for thread-safe, atomic JSON persistence."""
 import json
+import os
 import tempfile
 import threading
 import unittest
 from pathlib import Path
 
+import config
 import persistence
 
 
@@ -85,6 +87,34 @@ class SettingsPersistenceTests(PersistenceTestBase):
         settings = persistence.load_settings()
         self.assertTrue(Path(self.settings_file).exists())
         self.assertEqual(settings["download_mode"], "parallel")
+
+
+class DataDirTests(unittest.TestCase):
+    def test_state_paths_are_absolute_under_one_root(self):
+        root = Path(config.DATA_DIR)
+        self.assertTrue(root.is_absolute())
+        for path in (config.QUEUE_FILE, config.HISTORY_FILE,
+                     config.SETTINGS_FILE, config.LOG_DIR):
+            self.assertEqual(Path(path).parent, root)
+
+    def test_migration_copies_once_and_never_overwrites(self):
+        with tempfile.TemporaryDirectory() as source, \
+                tempfile.TemporaryDirectory() as target:
+            Path(source, "queue.json").write_text("[]", encoding="utf-8")
+            Path(source, "settings.json").write_text(
+                '{"theme": "light"}', encoding="utf-8")
+            Path(target, "settings.json").write_text(
+                '{"theme": "dark"}', encoding="utf-8")
+            cwd = os.getcwd()
+            os.chdir(source)
+            try:
+                self.assertEqual(config.migrate_legacy_files(target), ["queue.json"])
+                self.assertEqual(config.migrate_legacy_files(target), [])
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(Path(target, "queue.json").read_text(encoding="utf-8"), "[]")
+            self.assertEqual(Path(target, "settings.json").read_text(encoding="utf-8"),
+                             '{"theme": "dark"}')
 
 
 if __name__ == "__main__":

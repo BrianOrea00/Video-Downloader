@@ -4,8 +4,9 @@ import os
 from functools import wraps
 from logging.handlers import RotatingFileHandler
 
-# Create logs directory
-LOG_DIR = "logs"
+from config import LOG_DIR
+
+# Logs live in the per-user data directory, never next to the binary.
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
