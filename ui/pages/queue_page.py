@@ -256,7 +256,10 @@ class QueueRow(QFrame):
         main.addWidget(self.progress)
 
         self.stats = QLabel("")
-        self.stats.setStyleSheet(f"color: {ui_theme.color('gray_light')}; font-size: {ui_theme.px(11)}px;")
+        self.stats.setStyleSheet(
+            f"{ui_theme.mono_css()} color: {ui_theme.color('gray_light')};"
+            f" font-size: {ui_theme.px(11)}px;"
+        )
         self.stats.setVisible(item.status is DownloadStatus.DOWNLOADING)
         main.addWidget(self.stats)
 
@@ -502,7 +505,10 @@ class QueuePage(QWidget):
         self.path_label = ElidedLabel(
             self.settings.get("download_path") or "Select download folder\u2026"
         )
-        self.path_label.setStyleSheet(f"color: {ui_theme.color('muted')}; font-size: {ui_theme.px(11)}px;")
+        self.path_label.setStyleSheet(
+            f"{ui_theme.mono_css()} color: {ui_theme.color('muted')};"
+            f" font-size: {ui_theme.px(11)}px;"
+        )
         path_row.addWidget(self.path_label, 1)
         self.audio_pill = QPushButton("Audio Only")
         self.audio_pill.setObjectName("Pill")
@@ -693,8 +699,8 @@ class QueuePage(QWidget):
             badge = QLabel(duration, thumb)
             badge.setObjectName("Chip")
             badge.setStyleSheet(
-                f"font-family: {ui_theme.UI_FONT}, monospace;"
-                f"font-size: {ui_theme.px(10)}px; padding: 0 {ui_theme.px(4)}px;"
+                f"{ui_theme.mono_css()} font-size: {ui_theme.px(10)}px;"
+                f" padding: 0 {ui_theme.px(4)}px;"
             )
             badge.adjustSize()
             badge.move(
@@ -721,8 +727,8 @@ class QueuePage(QWidget):
         self.preview_meta = QLabel("")
         self.preview_meta.setObjectName("FormHelp")
         self.preview_meta.setStyleSheet(
-            f"font-family: {ui_theme.UI_FONT}, monospace;"
-            f"font-size: {ui_theme.px(11)}px; color: {ui_theme.color('gray_light')};"
+            f"{ui_theme.mono_css()} font-size: {ui_theme.px(11)}px;"
+            f" color: {ui_theme.color('gray_light')};"
         )
         body.addWidget(self.preview_meta)
         self._update_preview_meta()

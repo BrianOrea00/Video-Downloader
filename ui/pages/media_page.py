@@ -148,7 +148,7 @@ class MediaBrowser(QWidget):
         header_layout.setSpacing(px(8))
 
         self.path_label = QLabel("No download folder selected")
-        self.path_label.setObjectName("FormHelp")
+        self.path_label.setObjectName("PathLabel")
         header_layout.addWidget(self.path_label, 1)
 
         self.search = QLineEdit()
@@ -167,6 +167,8 @@ class MediaBrowser(QWidget):
         outer.addWidget(header)
 
         self.list = QListWidget()
+        # Long names elide with an ellipsis; the full name stays in the tooltip.
+        self.list.setTextElideMode(Qt.ElideRight)
         self.list.setIconSize(
             QSize(px(METRICS["grid_icon_w"]), px(METRICS["grid_icon_h"])))
         if self.icon_mode:
@@ -175,7 +177,7 @@ class MediaBrowser(QWidget):
             self.list.setMovement(QListWidget.Static)
             self.list.setGridSize(
                 QSize(px(METRICS["grid_cell_w"]), px(METRICS["grid_cell_h"])))
-            self.list.setWordWrap(True)
+            self.list.setWordWrap(False)
         self.list.itemDoubleClicked.connect(self._play_item)
         self.list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._context_menu)

@@ -171,8 +171,13 @@ MODE_LABELS = {"dark": "Dark", "light": "Light"}
 DEFAULT_FAMILY = "arisu"
 DEFAULT_MODE = "dark"
 
-UI_FONT = "Monocraft"
-FALLBACK_FONT = "monospace"
+# Two type roles. ``ui`` reads as prose (titles, labels, buttons, help text);
+# ``mono`` aligns numbers and identifiers (sizes, speeds, ETA, durations, paths).
+MONO_FONT = "Monocraft"          # bundled in the release build
+UI_FONT_CANDIDATES = (
+    "Inter", "Noto Sans", "Segoe UI", "SF Pro Text", "Ubuntu", "DejaVu Sans",
+)
+FALLBACK_MONO = "monospace"
 
 # ---- UI scale ---------------------------------------------------------------
 # Every pixel size in the app derives from BASE_* multiplied by UI_SCALE, so the
@@ -269,7 +274,7 @@ _QSS_RAW = """
         font-weight: 700; font-size: @{12}px;
     }
     #LogoTitle { font-size: @{13}px; font-weight: 700; color: $text; }
-    #LogoSub { font-size: @{10}px; color: $muted; }
+    #LogoSub { font-family: "$mono"; font-size: @{10}px; color: $muted; }
     #SectionLabel {
         font-size: @{9}px; letter-spacing: @{1}px; color: $muted;
         padding: @{4}px @{8}px;
@@ -293,7 +298,7 @@ _QSS_RAW = """
     }
     QPushButton#BurgerButton:hover { background: $hover; color: $text; }
     QPushButton#BurgerButton:focus { border: 1px solid $accent; }
-    #StorageHead { font-size: @{10}px; color: $gray_light; }
+    #StorageHead { font-family: "$mono"; font-size: @{10}px; color: $gray_light; }
     #Track { background: $border; border-radius: @{2}px; }
     #TrackFill { background: $accent; border-radius: @{2}px; }
 
@@ -363,6 +368,7 @@ _QSS_RAW = """
     }
     #FormName { font-size: @{12}px; color: $text; }
     #FormHelp { font-size: @{11}px; color: $gray_light; }
+    #PathLabel { font-family: "$mono"; font-size: @{11}px; color: $gray_light; }
 
     /* ---------- queue page ---------- */
     QPushButton#Pill {
@@ -434,6 +440,7 @@ def stylesheet(family: str | None = None, mode: str | None = None) -> str:
     """QSS for a family/mode at the active UI scale."""
     body = _PX_RE.sub(lambda m: str(px(int(m.group(1)))), _QSS_RAW)
     return Template(body).substitute(size=f"{font_size()}px",
+                                     mono=mono_family(),
                                      **tokens(family, mode))
 
 
@@ -456,11 +463,29 @@ def color(key: str) -> str:
     return tokens(_state["family"], _state["mode"]).get(key, "#ff00ff")
 
 
-def resolve_font() -> QFont:
+def ui_family() -> str:
+    """System UI sans, preferring the faces a release build bundles."""
+    families = set(QFontDatabase.families())
+    for name in UI_FONT_CANDIDATES:
+        if name in families:
+            return name
+    return QFontDatabase.systemFont(QFontDatabase.GeneralFont).family()
+
+
+def mono_family() -> str:
     """Monocraft when installed, otherwise the platform monospace face."""
     families = set(QFontDatabase.families())
-    family = UI_FONT if UI_FONT in families else FALLBACK_FONT
-    return QFont(family, font_pt())
+    return MONO_FONT if MONO_FONT in families else FALLBACK_MONO
+
+
+def mono_css() -> str:
+    """Inline ``font-family`` declaration for the mono role."""
+    return f'font-family: "{mono_family()}";'
+
+
+def resolve_font() -> QFont:
+    """The application font: the prose role, never the mono face."""
+    return QFont(ui_family(), font_pt())
 
 
 def apply_theme(app: QApplication, family: str | None = None,
