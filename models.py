@@ -27,7 +27,7 @@ class DownloadStatus(str, Enum):
     FAILED = "failed"
 
     @classmethod
-    def coerce(cls, value: object) -> "DownloadStatus":
+    def coerce(cls, value: object) -> DownloadStatus:
         """Return a valid status, defaulting unknown/legacy values to PENDING."""
         try:
             return cls(value)
@@ -64,7 +64,7 @@ class DownloadItem:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "DownloadItem":
+    def from_dict(cls, data: dict) -> DownloadItem:
         """Build an item from a persisted record, tolerating missing keys."""
         return cls(
             url=str(data.get("url", "")),

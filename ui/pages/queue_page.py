@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from urllib.parse import urlparse
 
-from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -27,16 +27,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import thumb_cache
 from config import RESOLUTIONS
 from downloader import Downloader
 from models import DownloadItem, DownloadStatus
 from persistence import save_history
 from queue_manager import QueueManager
 from queue_runner import QueueRunner
-from url_validator import validate_url
-import thumb_cache
 from ui import theme as ui_theme
 from ui.theme import METRICS, px
+from url_validator import validate_url
 
 logger = logging.getLogger(__name__)
 

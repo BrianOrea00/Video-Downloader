@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from ui.theme import METRICS, px, repolish
-
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -14,6 +12,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui.theme import METRICS, px, repolish
 
 # (page key, glyph, label)
 NAV_ITEMS = [

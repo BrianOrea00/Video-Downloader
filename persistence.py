@@ -25,7 +25,7 @@ _write_lock = threading.RLock()
 def _read(path: str, default: Any) -> Any:
     """Read JSON, returning ``default`` for a missing, empty or corrupt file."""
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, encoding="utf-8") as handle:
             return json.load(handle)
     except FileNotFoundError:
         return default

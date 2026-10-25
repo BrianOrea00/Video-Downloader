@@ -23,10 +23,18 @@ from PySide6.QtWidgets import (
 )
 
 from config import RESOLUTIONS
-from ui.theme import (DEFAULT_FAMILY, DEFAULT_MODE, METRICS, MODE_LABELS, MODES,
-                       THEME_LABELS, family_names, px)
 from downloader import Downloader
 from persistence import save_settings
+from ui.theme import (
+    DEFAULT_FAMILY,
+    DEFAULT_MODE,
+    METRICS,
+    MODE_LABELS,
+    MODES,
+    THEME_LABELS,
+    family_names,
+    px,
+)
 
 logger = logging.getLogger(__name__)
 

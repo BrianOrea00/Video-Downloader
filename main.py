@@ -7,8 +7,7 @@ from PySide6.QtWidgets import QApplication
 from logger import logger
 from persistence import load_settings
 from ui.main_window import MainWindow
-from ui.theme import (DEFAULT_FAMILY, DEFAULT_MODE, DEFAULT_UI_SCALE,
-                       apply_theme, set_ui_scale)
+from ui.theme import DEFAULT_FAMILY, DEFAULT_MODE, DEFAULT_UI_SCALE, apply_theme, set_ui_scale
 
 
 def main() -> int:

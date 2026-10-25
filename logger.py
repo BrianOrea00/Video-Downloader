@@ -1,8 +1,8 @@
 # logger.py
 import logging
 import os
-from logging.handlers import RotatingFileHandler
 from functools import wraps
+from logging.handlers import RotatingFileHandler
 
 # Create logs directory
 LOG_DIR = "logs"

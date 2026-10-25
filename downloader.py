@@ -1,8 +1,9 @@
 # downloader.py
-import yt_dlp
-import threading
 import logging
+import threading
 import time
+
+import yt_dlp
 
 logger = logging.getLogger(__name__)
 

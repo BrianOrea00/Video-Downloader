@@ -14,10 +14,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize, QThread, Signal
+from PySide6.QtCore import QSize, Qt, QThread, Signal
 from PySide6.QtGui import QIcon, QPixmap
-from ui.theme import METRICS, px
-
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -33,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 import thumb_cache
+from ui.theme import METRICS, px
 
 logger = logging.getLogger(__name__)
 

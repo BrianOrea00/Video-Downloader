@@ -1,18 +1,20 @@
 import json
 import os
-from config import HISTORY_FILE, QUEUE_FILE, SETTINGS_FILE, DEFAULT_SETTINGS
+
+from config import DEFAULT_SETTINGS, HISTORY_FILE, QUEUE_FILE, SETTINGS_FILE
+
 
 def save_history(data):
     from datetime import datetime
-    
+
     if not os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, "w") as f:
             json.dump([], f)
-    
+
     # Add date_added if not present
     if "date_added" not in data:
         data["date_added"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
+
     with open(HISTORY_FILE, "r+") as f:
         history = json.load(f)
         history.append(data)
@@ -27,7 +29,7 @@ def load_queue():
     if not os.path.exists(QUEUE_FILE):
         return []
     try:
-        with open(QUEUE_FILE, "r") as f:
+        with open(QUEUE_FILE) as f:
             return json.load(f)
     except:
         return []
@@ -43,7 +45,7 @@ def load_settings():
         save_settings(DEFAULT_SETTINGS)
         return DEFAULT_SETTINGS.copy()
     try:
-        with open(SETTINGS_FILE, "r") as f:
+        with open(SETTINGS_FILE) as f:
             return json.load(f)
     except:
         return DEFAULT_SETTINGS.copy()
@@ -55,11 +57,11 @@ def save_settings(settings):
 
 def detect_vlc():
     """Auto-detect VLC executable path"""
-    import sys
     import subprocess
-    
+    import sys
+
     common_paths = []
-    
+
     if sys.platform == "win32":
         common_paths = [
             r"C:\Program Files\VideoLAN\VLC\vlc.exe",
@@ -74,11 +76,11 @@ def detect_vlc():
             "/usr/bin/vlc",
             "/usr/local/bin/vlc",
         ]
-    
+
     for path in common_paths:
         if os.path.exists(path):
             return path
-    
+
     # Try to find in PATH
     try:
         result = subprocess.run(['which', 'vlc'], capture_output=True, text=True)
@@ -86,5 +88,5 @@ def detect_vlc():
             return result.stdout.strip()
     except:
         pass
-    
+
     return None

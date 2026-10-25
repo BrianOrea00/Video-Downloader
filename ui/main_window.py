@@ -14,16 +14,24 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from persistence import save_settings
 import persistence
+from persistence import save_settings
 from queue_manager import QueueManager
 from ui.pages.music_page import MusicPage
 from ui.pages.queue_page import QueuePage
 from ui.pages.settings_page import SettingsPage
 from ui.pages.videos_page import VideosPage
 from ui.sidebar import Sidebar
-from ui.theme import (DEFAULT_FAMILY, DEFAULT_MODE, METRICS, MODES, THEMES,
-                       apply_theme, flip_mode, px)
+from ui.theme import (
+    DEFAULT_FAMILY,
+    DEFAULT_MODE,
+    METRICS,
+    MODES,
+    THEMES,
+    apply_theme,
+    flip_mode,
+    px,
+)
 
 TITLES = {
     "queue": "Download Queue",
