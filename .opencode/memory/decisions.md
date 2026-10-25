@@ -32,3 +32,7 @@
 
 - **ffmpeg is a hard dependency for two paths**: audio-only (`FFmpegExtractAudio`) and MP4 merge. `utils.ffmpeg_available()` gates the Audio Only pill and the Settings checkbox, and `add_to_queue` refuses the combination with an explanation. A saved `default_audio_only` must never re-enable a disabled pill — it is ANDed with the probe.
 - **`sys.excepthook` is installed in `main()`** after `QApplication` exists: logs `CRITICAL` with the traceback, then shows a `QMessageBox`. A windowed/frozen build has no visible stderr.
+
+- **Queue feedback is a banner, not a dialog**: `QueuePage._notify(text, level)` writes to `self.banner` under the input card, auto-hides after 8 s, and is dismissible. `QMessageBox` stays only for decisions (duplicate URL / previously downloaded). Do not add routine `information()`/`warning()` calls back.
+- **`DownloadItem.message` / `.filename`** are persisted optional keys: `message` is the failure reason rendered on the row, `filename` is the yt-dlp final name used by Play. `_set_status(PENDING)` clears `message`; retry reuses the pause/resume path.
+- **Queue rows say "Remove"** with a tooltip that the file is kept; the trash icon belongs to the media library only.
