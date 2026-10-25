@@ -29,3 +29,6 @@
 
 - **One per-user data dir** (`config.DATA_DIR`): Linux `$XDG_DATA_HOME/video-downloader`, macOS `~/Library/Application Support/Video-Downloader`, Windows `%APPDATA%\Video-Downloader`. All state (`queue.json`, `history.json`, `settings.json`), `logs/` and `app.lock` resolve from it at import time — tests still override the module constants, but nothing is written to the repo anymore. `VIDEO_DOWNLOADER_DATA_DIR` overrides it. `config.migrate_legacy_files()` copies legacy cwd JSON once and never overwrites.
 - **Single instance** = `QLockFile(DATA_DIR/app.lock)` in `main.py`; a second launch shows a message and returns 0. Do not pass `setStaleLockTime(0)` — Qt's default PID check is what clears locks left by a crashed process.
+
+- **ffmpeg is a hard dependency for two paths**: audio-only (`FFmpegExtractAudio`) and MP4 merge. `utils.ffmpeg_available()` gates the Audio Only pill and the Settings checkbox, and `add_to_queue` refuses the combination with an explanation. A saved `default_audio_only` must never re-enable a disabled pill — it is ANDed with the probe.
+- **`sys.excepthook` is installed in `main()`** after `QApplication` exists: logs `CRITICAL` with the traceback, then shows a `QMessageBox`. A windowed/frozen build has no visible stderr.
