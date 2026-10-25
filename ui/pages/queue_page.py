@@ -7,10 +7,11 @@ Mirrors ``docs/ui-prototype.html`` (#page-queue). State lives in
 from __future__ import annotations
 
 import logging
+import os
 from urllib.parse import urlparse
 
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
+from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFileDialog,
@@ -190,6 +191,7 @@ class QueueRow(QFrame):
     cancel = Signal(object)
     resume = Signal(object)
     remove = Signal(object)
+    play = Signal(object)
 
     def __init__(self, item: DownloadItem, parent=None) -> None:
         super().__init__(parent)
@@ -210,7 +212,7 @@ class QueueRow(QFrame):
 
         main = QVBoxLayout()
         main.setSpacing(px(3))
-        self.title_label = QLabel(item.title[:80])
+        self.title_label = ElidedLabel(item.title)
         if item.status is DownloadStatus.COMPLETED:
             self.title_label.setStyleSheet(f"color: {ui_theme.color('muted')};")
         main.addWidget(self.title_label)
@@ -225,6 +227,13 @@ class QueueRow(QFrame):
         meta.addWidget(status)
         meta.addStretch(1)
         main.addLayout(meta)
+
+        if item.status is DownloadStatus.FAILED and item.message:
+            reason = ElidedLabel(item.message)
+            reason.setStyleSheet(
+                f"color: {ui_theme.color('error')}; font-size: {ui_theme.px(10)}px;"
+            )
+            main.addWidget(reason)
 
         self.progress = QProgressBar()
         self.progress.setObjectName("RowProgress")
@@ -243,13 +252,23 @@ class QueueRow(QFrame):
 
         actions = QHBoxLayout()
         actions.setSpacing(px(6))
-        actions.addWidget(self._icon_button("\U0001f4c1", "Open folder", lambda: self.open_folder.emit(self.item)))
+        if item.status is DownloadStatus.COMPLETED and item.filename:
+            actions.addWidget(self._text_button(
+                "Play", "Play file", lambda: self.play.emit(self.item)))
+        actions.addWidget(self._icon_button(
+            "\U0001f4c1", "Open folder", lambda: self.open_folder.emit(self.item)))
         if item.status is DownloadStatus.DOWNLOADING:
-            actions.addWidget(self._icon_button("\u2715", "Cancel", lambda: self.cancel.emit(self.item)))
+            actions.addWidget(self._icon_button(
+                "\u2715", "Cancel", lambda: self.cancel.emit(self.item)))
         if item.status is DownloadStatus.PAUSED:
-            actions.addWidget(self._icon_button("\u21bb", "Resume", lambda: self.resume.emit(self.item)))
-        if item.status is not DownloadStatus.DOWNLOADING:
-            actions.addWidget(self._icon_button("\U0001f5d1", "Delete", lambda: self.remove.emit(self.item)))
+            actions.addWidget(self._icon_button(
+                "\u21bb", "Resume", lambda: self.resume.emit(self.item)))
+        if item.status is DownloadStatus.FAILED:
+            actions.addWidget(self._text_button(
+                "Retry", "Retry download", lambda: self.resume.emit(self.item)))
+        actions.addWidget(self._text_button(
+            "Remove", "Remove from queue (the file is kept)",
+            lambda: self.remove.emit(self.item)))
         row.addLayout(actions)
 
     def _icon_button(self, glyph: str, tip: str, slot) -> QPushButton:
@@ -260,6 +279,19 @@ class QueueRow(QFrame):
         button.setCursor(Qt.PointingHandCursor)
         button.clicked.connect(slot)
         return button
+
+    def _text_button(self, text: str, tip: str, slot) -> QPushButton:
+        button = QPushButton(text)
+        button.setToolTip(tip)
+        button.setAccessibleName(tip)
+        button.setCursor(Qt.PointingHandCursor)
+        button.clicked.connect(slot)
+        return button
+
+    def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802 - Qt override
+        if self.item.status is DownloadStatus.COMPLETED and self.item.filename:
+            self.play.emit(self.item)
+        super().mouseDoubleClickEvent(event)
 
     def set_progress(self, percent: float, data: dict) -> None:
         self.progress.setVisible(True)
@@ -340,6 +372,7 @@ class QueuePage(QWidget):
         col.setSpacing(px(16))
 
         col.addWidget(self._build_input_card())
+        col.addWidget(self._build_banner())
 
         self.chips_row = QHBoxLayout()
         self.chips_row.setSpacing(px(8))
@@ -362,6 +395,35 @@ class QueuePage(QWidget):
         label = QLabel(text.upper())
         label.setObjectName("FieldLabel")
         return label
+
+    def _build_banner(self) -> QWidget:
+        """Inline status line: success and routine information never modal."""
+        self.banner = QFrame()
+        self.banner.setObjectName("Card")
+        self.banner.setVisible(False)
+        layout = QHBoxLayout(self.banner)
+        layout.setContentsMargins(px(12), px(8), px(12), px(8))
+        layout.setSpacing(px(8))
+        self.banner_label = QLabel("")
+        self.banner_label.setWordWrap(True)
+        self.banner_label.setAccessibleName("Status message")
+        layout.addWidget(self.banner_label, 1)
+        dismiss = QPushButton("Dismiss")
+        dismiss.clicked.connect(lambda: self.banner.setVisible(False))
+        layout.addWidget(dismiss)
+        self._banner_timer = QTimer(self)
+        self._banner_timer.setSingleShot(True)
+        self._banner_timer.timeout.connect(lambda: self.banner.setVisible(False))
+        return self.banner
+
+    def _notify(self, text: str, level: str = "info") -> None:
+        token = {"info": "text_2", "error": "error", "success": "success"}[level]
+        self.banner_label.setText(text)
+        self.banner_label.setStyleSheet(
+            f"color: {ui_theme.color(token)}; font-size: {ui_theme.px(11)}px;"
+        )
+        self.banner.setVisible(True)
+        self._banner_timer.start(8000)
 
     def _build_input_card(self) -> QWidget:
         card = QFrame()
@@ -536,7 +598,7 @@ class QueuePage(QWidget):
         if text:
             self.url_input.setText(text)
         else:
-            QMessageBox.information(self, "Clipboard", "Clipboard is empty.")
+            self._notify("Clipboard is empty.")
 
     def browse(self) -> None:
         start = self.settings.get("download_path") or ""
@@ -657,17 +719,18 @@ class QueuePage(QWidget):
     def add_to_queue(self) -> None:
         url = self._last_sanitized or self.url_input.text().strip()
         if not url:
-            QMessageBox.warning(self, "Missing URL", "Please enter a video URL.")
+            self._notify("Please enter a video URL.", "error")
+            self.url_input.setFocus()
             return
         path = self.settings.get("download_path") or ""
         if not path:
-            QMessageBox.warning(self, "Missing folder", "Please select a download folder.")
+            self._notify("Please select a download folder.", "error")
             return
         if self.audio_pill.isChecked() and not self._ffmpeg:
-            QMessageBox.warning(
-                self, "ffmpeg missing",
-                "Audio-only downloads need ffmpeg on your PATH.\n\n"
+            self._notify(
+                "Audio-only downloads need ffmpeg on your PATH. "
                 "Install ffmpeg, or clear the Audio Only pill to download video.",
+                "error",
             )
             return
 
@@ -707,7 +770,7 @@ class QueuePage(QWidget):
     def start(self) -> None:
         items = self.manager.runnable_items()
         if not items:
-            QMessageBox.information(self, "Queue empty", "No pending downloads in queue.")
+            self._notify("No pending downloads in the queue.")
             return
         self.manager.mark_running(items)
         self.start_btn.setEnabled(False)
@@ -746,19 +809,27 @@ class QueuePage(QWidget):
         return None
 
     def _set_status(self, item: DownloadItem, status: DownloadStatus) -> None:
+        if status is DownloadStatus.PENDING:
+            item.message = ""
         if status is DownloadStatus.PENDING and item.status is DownloadStatus.PAUSED:
             index = self._index_of(item)
             if index is not None:
                 self.manager.resume(index)
 
+    def play_item(self, item: DownloadItem) -> None:
+        target = os.path.join(item.path, item.filename) if item.filename else ""
+        if not target or not os.path.exists(target):
+            self._notify("That file is no longer in the download folder.", "error")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(target))
+
     def open_folder(self, item: DownloadItem) -> None:
-        import os
         import subprocess
         import sys
 
         path = item.path
         if not path or not os.path.exists(path):
-            QMessageBox.information(self, "Folder", "Download folder does not exist yet.")
+            self._notify("Download folder does not exist yet.", "error")
             return
         if sys.platform == "win32":
             os.startfile(path)  # noqa: S606
@@ -786,10 +857,12 @@ class QueuePage(QWidget):
             self.download_completed.emit()
         elif "cancel" in lower or "stop" in lower:
             self.manager.mark_paused(item)
+            item.message = ""
             logger.info("Download paused: %s", item.title)
         else:
+            item.message = message or "Download failed"
             self.manager.mark_failed(item)
-            logger.error("Download failed: %s - %s", item.title, message)
+            logger.error("Download failed: %s - %s", item.title, item.message)
         self.refresh()
 
     def _on_run_finished(self) -> None:
@@ -800,6 +873,9 @@ class QueuePage(QWidget):
     def _on_item_info(self, item: DownloadItem, info: dict) -> None:
         """Cache the video thumbnail once a download reports its info."""
         filename = thumb_cache.final_filename(info)
+        if filename and item.filename != filename:
+            item.filename = filename
+            self.manager.save()
         thumb_url = info.get("thumbnail")
         if not (filename and thumb_url):
             return
@@ -837,6 +913,7 @@ class QueuePage(QWidget):
     def _make_row(self, item: DownloadItem) -> QueueRow:
         row = QueueRow(item)
         row.open_folder.connect(self.open_folder)
+        row.play.connect(self.play_item)
         row.cancel.connect(lambda i: self.stop())
         row.resume.connect(self.resume_item)
         row.remove.connect(self.remove_item)

@@ -46,6 +46,8 @@ class DownloadItem:
     title: str = "Unknown"
     status: DownloadStatus = DownloadStatus.PENDING
     date_added: str = ""
+    message: str = ""    # failure reason, shown inline on the row
+    filename: str = ""   # final file name once yt-dlp reports it
 
     def __post_init__(self) -> None:
         if not self.date_added:
@@ -61,6 +63,8 @@ class DownloadItem:
             "title": self.title,
             "status": self.status.value,
             "date_added": self.date_added,
+            "message": self.message,
+            "filename": self.filename,
         }
 
     @classmethod
@@ -74,4 +78,6 @@ class DownloadItem:
             title=str(data.get("title", "Unknown")),
             status=DownloadStatus.coerce(data.get("status", DownloadStatus.PENDING.value)),
             date_added=str(data.get("date_added", "")),
+            message=str(data.get("message", "")),
+            filename=str(data.get("filename", "")),
         )
