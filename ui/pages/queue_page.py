@@ -7,9 +7,10 @@ Mirrors ``docs/ui-prototype.html`` (#page-queue). State lives in
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlparse
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFileDialog,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -96,6 +98,41 @@ def _chip(text: str) -> QLabel:
     label = QLabel(text)
     label.setObjectName("Chip")
     return label
+
+
+class ElidedLabel(QLabel):
+    """Single-line label that elides in the middle instead of forcing width.
+
+    The full text stays available as the tooltip and through :meth:`fullText`.
+    """
+
+    def __init__(self, text: str = "", parent=None) -> None:
+        super().__init__(parent)
+        self._full = ""
+        self.setWordWrap(False)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.setText(text)
+
+    def setText(self, text: str) -> None:
+        self._full = text or ""
+        self.setToolTip(self._full)
+        self._render_elided()
+
+    def fullText(self) -> str:
+        return self._full
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._render_elided()
+
+    def _render_elided(self) -> None:
+        if not self._full:
+            return
+        width = self.width()
+        if width <= 0:
+            super().setText(self._full)
+            return
+        super().setText(self.fontMetrics().elidedText(self._full, Qt.ElideMiddle, width))
 
 
 class InfoWorker(QThread):
@@ -263,8 +300,29 @@ class QueuePage(QWidget):
         self.runner.run_finished.connect(self._on_run_finished)
 
         self.refresh()
+        self._wire_shortcuts()
 
-    # -- construction ------------------------------------------------------
+    def _wire_shortcuts(self) -> None:
+        """Keyboard parity: every primary action has a key.
+
+        The shortcuts use the default ``WindowShortcut`` context, so a modal
+        dialog (which is its own window) does not let them fire underneath.
+        """
+        self.url_input.returnPressed.connect(self.add_to_queue)
+        for sequence, slot in (
+            ("Ctrl+Return", self.start),
+            ("Ctrl+Enter", self.start),
+            ("Ctrl+.", self.stop),
+            ("Esc", self._clear_input),
+        ):
+            shortcut = QShortcut(QKeySequence(sequence), self)
+            shortcut.activated.connect(slot)
+
+    def _clear_input(self) -> None:
+        self.url_input.clear()
+        self._hide_preview()
+        self.url_input.setFocus()
+
     def _build(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -274,7 +332,13 @@ class QueuePage(QWidget):
         outer.addWidget(scroll)
         container = QWidget()
         scroll.setWidget(container)
-        col = QVBoxLayout(container)
+        center = QHBoxLayout(container)
+        center.setContentsMargins(0, 0, 0, 0)
+        inner = QWidget()
+        inner.setMaximumWidth(px(980))
+        inner.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        center.addWidget(inner, 1, Qt.AlignHCenter)
+        col = QVBoxLayout(inner)
         col.setContentsMargins(px(24), px(20), px(24), px(20))
         col.setSpacing(px(16))
 
@@ -331,6 +395,12 @@ class QueuePage(QWidget):
         input_row.addWidget(add_btn)
         layout.addLayout(input_row)
 
+        self.validity_label = QLabel("")
+        self.validity_label.setObjectName("FormHelp")
+        self.validity_label.setWordWrap(True)
+        self.validity_label.setVisible(False)
+        layout.addWidget(self.validity_label)
+
         pills = QHBoxLayout()
         pills.setSpacing(px(6))
         self._res_group = QButtonGroup(self)
@@ -350,20 +420,21 @@ class QueuePage(QWidget):
             self._res_buttons[res] = pill
             pills.addWidget(pill)
         pills.addStretch(1)
+        layout.addLayout(pills)
+
+        path_row = QHBoxLayout()
+        path_row.setSpacing(px(8))
+        self.path_label = ElidedLabel(
+            self.settings.get("download_path") or "Select download folder\u2026"
+        )
+        self.path_label.setStyleSheet(f"color: {ui_theme.color('muted')}; font-size: {ui_theme.px(11)}px;")
+        path_row.addWidget(self.path_label, 1)
         self.audio_pill = QPushButton("Audio Only")
         self.audio_pill.setObjectName("Pill")
         self.audio_pill.setCheckable(True)
         self.audio_pill.setCursor(Qt.PointingHandCursor)
         self.audio_pill.setChecked(bool(self.settings.get("default_audio_only", False)))
-        pills.addWidget(self.audio_pill)
-        layout.addLayout(pills)
-
-        path_row = QHBoxLayout()
-        path_row.setSpacing(px(8))
-        self.path_label = QLabel(self.settings.get("download_path") or "Select download folder\u2026")
-        self.path_label.setStyleSheet(f"color: {ui_theme.color('muted')}; font-size: {ui_theme.px(11)}px;")
-        self.path_label.setWordWrap(False)
-        path_row.addWidget(self.path_label, 1)
+        path_row.addWidget(self.audio_pill)
         browse = QPushButton("Browse")
         browse.clicked.connect(self.browse)
         path_row.addWidget(browse)
@@ -394,24 +465,48 @@ class QueuePage(QWidget):
         actions.addWidget(self.stop_btn)
         actions.addWidget(clear_btn)
         actions.addStretch(1)
+        hint = QLabel("Enter adds \u00b7 Ctrl+\u21b5 starts")
+        hint.setObjectName("FormHelp")
+        actions.addWidget(hint)
         return actions
 
     # -- input handlers ----------------------------------------------------
+    def _set_validity(self, message: str, key: str | None) -> None:
+        """Inline validation text, so validity is never colour-only."""
+        if not message or key is None:
+            self.validity_label.clear()
+            self.validity_label.setVisible(False)
+            self.url_input.setAccessibleDescription("")
+            return
+        self.validity_label.setText(message)
+        self.validity_label.setStyleSheet(
+            f"color: {ui_theme.color(key)}; font-size: {ui_theme.px(11)}px;"
+        )
+        self.validity_label.setVisible(True)
+        self.url_input.setAccessibleDescription(message)
+
     def _on_url_changed(self, text: str) -> None:
         text = text.strip()
         if not text:
             self._hide_preview()
             self.url_input.setStyleSheet("")
+            self._set_validity("", None)
             self._last_sanitized = None
             return
         result = validate_url(text)
+        host = urlparse(result["sanitized"]).hostname or "supported site"
         if result["valid"]:
             self._last_sanitized = result["sanitized"]
             self.url_input.setStyleSheet(f"border: 1px solid {ui_theme.color('success')};")
+            self._set_validity(f"\u2713 Recognised link \u2014 {host}", "success")
             self._fetch_preview(result["sanitized"])
         else:
             self._last_sanitized = None
             self.url_input.setStyleSheet(f"border: 1px solid {ui_theme.color('error')};")
+            self._set_validity(
+                "\u2715 Not a supported link \u2014 paste a YouTube or yt-dlp-supported URL",
+                "error",
+            )
             self._hide_preview()
 
     def set_resolution(self, res: str) -> None:
@@ -716,6 +811,7 @@ class QueuePage(QWidget):
 
         if not items:
             empty = QLabel("No downloads yet \u2014 paste a link above to get started.")
+            empty.setWordWrap(True)
             empty.setStyleSheet(f"color: {ui_theme.color('muted')};")
             self.queue_list.addWidget(empty)
 

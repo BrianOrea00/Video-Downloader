@@ -41,16 +41,21 @@ class MainWindow(QMainWindow):
         self.mode = settings.get("theme", DEFAULT_MODE)
 
         self.setWindowTitle("Video Downloader")
-        # Scale the window with the UI, but never demand more than the screen has.
-        min_w = px(METRICS["min_window_w"])
-        min_h = px(METRICS["min_window_h"])
+        # Minimums stay in device pixels: scaling them as well made the window
+        # demand 1350x900 at the shipped 1.5 scale and clip on a 1366 laptop.
+        min_w = METRICS["min_window_w"]
+        min_h = METRICS["min_window_h"]
         screen = QApplication.primaryScreen()
-        if screen is not None:
-            available = screen.availableGeometry()
+        available = screen.availableGeometry() if screen is not None else None
+        if available is not None:
             min_w = min(min_w, max(320, int(available.width() * 0.9)))
             min_h = min(min_h, max(240, int(available.height() * 0.9)))
         self.setMinimumSize(min_w, min_h)
-        self.resize(max(min_w, px(1200)), max(min_h, px(700)))
+        start_w, start_h = px(1200), px(700)
+        if available is not None:
+            start_w = min(start_w, available.width())
+            start_h = min(start_h, available.height())
+        self.resize(max(min_w, start_w), max(min_h, start_h))
 
         central = QWidget()
         self.setCentralWidget(central)
