@@ -189,6 +189,8 @@ Go to **Settings → Cookies** and choose one of:
 - Not all websites are supported — depends on `yt-dlp`'s extractor list
 - Some videos may be restricted (private, DRM-protected, etc.)
 - On Linux, install `xclip` or `xsel` if clipboard auto-detection isn't working: `sudo apt install xclip`
+- There is no telemetry. `app.log` redacts URLs and your home directory, but read it
+  before you share it. Security reports: see [`SECURITY.md`](SECURITY.md).
 
 ---
 
