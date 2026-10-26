@@ -6,6 +6,7 @@ from pathlib import Path
 RESOLUTIONS = ["144", "240", "360", "480", "720", "1080"]
 DEFAULT_PATH = ""
 
+APP_VERSION = "1.0.0"
 APP_DIR_NAME = "Video-Downloader"
 LEGACY_FILES = ("history.json", "queue.json", "settings.json")
 DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads")

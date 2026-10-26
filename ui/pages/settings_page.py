@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config import RESOLUTIONS
+from config import APP_VERSION, DATA_DIR, RESOLUTIONS
 from downloader import Downloader
 from persistence import save_settings
 from ui.theme import (
@@ -96,6 +96,7 @@ class SettingsPage(QWidget):
         col.addWidget(self._download_card())
         col.addWidget(self._cookies_card())
         col.addWidget(self._appearance_card())
+        col.addWidget(self._about_card())
 
         # Every control saves itself: there is no form-level commit step.
         self.status = QLabel("")
@@ -243,6 +244,20 @@ class SettingsPage(QWidget):
             self._label("Reduce motion", "Turns off the progress and fade animations."),
             self.reduce_motion,
         )
+        return card
+
+    def _about_card(self) -> QFrame:
+        card, form = self._card("ABOUT")
+        version = QLabel(APP_VERSION)
+        version.setObjectName("PathLabel")
+        version.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow(QLabel("Version"), version)
+
+        folder = QLabel(DATA_DIR)
+        folder.setObjectName("PathLabel")
+        folder.setWordWrap(True)
+        folder.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow(QLabel("Data folder"), folder)
         return card
 
     # -- helpers -----------------------------------------------------------

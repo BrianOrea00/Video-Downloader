@@ -49,6 +49,7 @@ def main() -> int:
     logger.info("Starting Video Downloader")
     app = QApplication(sys.argv)
     app.setApplicationName("Video Downloader")
+    app.setApplicationVersion(config.APP_VERSION)
     _install_excepthook()
 
     # One process per user data directory: two instances would race the
