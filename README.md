@@ -58,10 +58,11 @@ video_downloader/
 ├── downloader.py       # yt-dlp wrapper with progress hooks and cookie support
 ├── url_validator.py    # URL validation and sanitising
 ├── config.py           # Constants, resolution list, default settings
-├── utils.py            # VLC detection and small helpers
+├── utils.py            # Resource paths, FFmpeg check, VLC detection
 ├── ui/
 │   ├── theme.py        # Theme families × dark/light tokens + QSS stylesheet
-│   ├── sidebar.py      # Navigation rail
+│   ├── icons.py        # Tinted Tabler glyphs, cached per (name, size, colour)
+│   ├── sidebar.py      # Navigation rail + storage meter
 │   ├── main_window.py  # Shell: sidebar + top bar + stacked pages
 │   └── pages/
 │       ├── queue_page.py     # Download Console
@@ -69,9 +70,14 @@ video_downloader/
 │       ├── videos_page.py    # Video grid
 │       ├── music_page.py     # Music list
 │       └── settings_page.py  # Settings form
-├── tests/              # unittest suite
-├── assets/             # PNG icons (Tabler icon set)
+├── tests/              # unittest suite, including an offscreen GUI smoke test
+├── assets/             # Tabler PNG icons, app icon, bundled Monocraft + OFL
+├── packaging/          # PyInstaller spec, .desktop, AppStream metadata
+├── .github/workflows/  # CI: ruff + tests on 3.11–3.13
+├── LICENSE             # GPL-3.0-or-later
+├── THIRD_PARTY_NOTICES.md
 ├── requirements.txt
+├── requirements-dev.txt
 └── pyproject.toml      # Ruff + pytest configuration
 ```
 
