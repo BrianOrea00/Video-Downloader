@@ -188,4 +188,16 @@ Go to **Settings → Cookies** and choose one of:
 
 ## 📄 License
 
-This project is for educational purposes.
+Video Downloader is free software: you can redistribute it and/or modify it under
+the terms of the **GNU General Public License, version 3 or later** (GPL-3.0-or-later).
+The full text is in [`LICENSE`](LICENSE); third-party components and their licences
+are listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+The GPL is not optional here: `mutagen` (music metadata) is GPL-2.0-or-later, so a
+GPL-compatible application licence is the only one that can ship it. Distributing a
+binary requires making the corresponding source available, which is why the source
+link above and the release archives matter.
+
+This software is provided for personal, lawful use. Downloading content you do not
+have the right to download may violate the terms of service of the site or the law
+where you live.

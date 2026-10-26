@@ -258,6 +258,18 @@ class SettingsPage(QWidget):
         folder.setWordWrap(True)
         folder.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow(QLabel("Data folder"), folder)
+
+        licence = QLabel("GPL-3.0-or-later")
+        licence.setObjectName("PathLabel")
+        form.addRow(QLabel("License"), licence)
+
+        source = QLabel(
+            '<a href="https://github.com/BrianOrea00/Video-Downloader">'
+            "Source code</a>"
+        )
+        source.setOpenExternalLinks(True)
+        source.setTextFormat(Qt.RichText)
+        form.addRow(QLabel("Project"), source)
         return card
 
     # -- helpers -----------------------------------------------------------
