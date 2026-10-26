@@ -58,3 +58,5 @@
 - **`utils.py` holds only live helpers** (`resource_path`, `ffmpeg_available`, `detect_vlc`); the legacy JSON read/write wrappers and `clean_filename` were deleted because `persistence.py` owns that (atomic writes, corrupt-file recovery) and nothing called them. That also removed the last bare `except` clauses, so `ruff check .` is clean.
 
 - **App identity assets**: `assets/appicon.png` (512, Tabler download glyph on the arisu gradient) and `assets/appicon.ico` (16-256, for the Windows build) are set through `app.setWindowIcon` together with `setDesktopFileName("video-downloader")`, so the dock icon matches a future `.desktop` entry instead of a generic Python icon.
+
+- **Dependency set is extras-complete** (`requirements.txt`): `yt-dlp[default,secretstorage]==2026.8.19` (the extras supply certifi, requests, brotli, websockets, pycryptodomex, yt-dlp-ejs and the Linux cookie backend) and `PySide6-Essentials`, because only Core/Gui/Widgets are imported and the Addons wheel adds ~400 MB of unused WebEngine. The dev venv still has full PySide6 installed; the requirements file is the source of truth for a clean install.
