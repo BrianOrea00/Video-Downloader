@@ -431,6 +431,7 @@ class QueuePage(QWidget):
         self._preview_workers: set[PreviewThumbWorker] = set()
         self._last_sanitized: str | None = None
         self._selected: DownloadItem | None = None
+        self._last_clipboard = ""
 
         self.manager.load()
         self._build()
@@ -442,6 +443,10 @@ class QueuePage(QWidget):
 
         self.refresh()
         self._wire_shortcuts()
+
+        self._clipboard_timer = QTimer(self)
+        self._clipboard_timer.timeout.connect(self._poll_clipboard)
+        self._apply_clipboard_settings()
 
     def _wire_shortcuts(self) -> None:
         """Keyboard parity: every primary action has a key.
@@ -760,13 +765,48 @@ class QueuePage(QWidget):
         self._update_preview_meta()
 
     def apply_defaults(self) -> None:
-        """Re-apply default resolution/audio from settings to the input bar."""
+        """Re-apply values from Settings that affect the input bar."""
         res = self.settings.get("default_resolution", "720")
         if res in self._res_buttons:
             self.set_resolution(res)
         self.audio_pill.setChecked(
             self._ffmpeg and bool(self.settings.get("default_audio_only", False))
         )
+        self._apply_clipboard_settings()
+
+    # -- clipboard auto-detection ------------------------------------------
+    def _apply_clipboard_settings(self) -> None:
+        """Arm or disarm the poller from the current settings, immediately."""
+        interval = int(self.settings.get("clipboard_interval", 1000) or 1000)
+        self._clipboard_timer.setInterval(max(250, interval))
+        if self.settings.get("auto_clipboard", False):
+            self._clipboard_timer.start()
+        else:
+            self._clipboard_timer.stop()
+
+    def _poll_clipboard(self) -> None:
+        """Fill the URL field when a supported link is copied.
+
+        Skipped while the user is typing in the field or a preview fetch is in
+        flight, and every distinct clipboard value is only considered once.
+        """
+        from PySide6.QtWidgets import QApplication
+
+        text = (QApplication.clipboard().text() or "").strip()
+        if not text or text == self._last_clipboard:
+            return
+        # Do not remember a value we skipped on purpose, or the link copied
+        # while the field had focus would never be picked up afterwards.
+        if self.url_input.hasFocus():
+            return
+        if self._info_worker is not None and self._info_worker.isRunning():
+            return
+        self._last_clipboard = text
+        result = validate_url(text)
+        if not result["valid"] or result["sanitized"] == self._last_sanitized:
+            return
+        self.url_input.setText(result["sanitized"])
+        self._notify("Filled the link from your clipboard.")
 
     def paste(self) -> None:
         from PySide6.QtWidgets import QApplication

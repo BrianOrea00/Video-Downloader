@@ -103,6 +103,26 @@ class GuiSmokeTest(unittest.TestCase):
         self.assertEqual(saved["download_mode"], "sequential")
         self.assertEqual(page.status.text(), "Saved" if page.status.text() else "")
 
+    def test_clipboard_poller_respects_its_switch(self):
+        page = self.window.queue_page
+        timer = page._clipboard_timer
+        self.assertFalse(timer.isActive())   # opt-in, so no surprise reads
+
+        self.window.show_page("settings")
+        page.settings["auto_clipboard"] = True
+        self.window.settings_page.settings_changed.emit()
+        self.assertTrue(timer.isActive())
+
+        # No network in CI: the fill path is what this test covers.
+        page._fetch_preview = lambda _url: None
+        self.app.clipboard().setText("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        page._poll_clipboard()
+        self.assertIn("dQw4w9WgXcQ", page.url_input.text())
+
+        page.settings["auto_clipboard"] = False
+        self.window.settings_page.settings_changed.emit()
+        self.assertFalse(timer.isActive())
+
     def test_library_pages_scan_without_error(self):
         sample = Path(self.settings["download_path"]) / "sample.mp4"
         sample.write_bytes(b"\0" * 1024)

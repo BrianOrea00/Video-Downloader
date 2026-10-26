@@ -58,8 +58,8 @@ DEFAULT_SETTINGS = {
     "theme_family": "arisu",  # Palette: "arisu", "saas" or "arch"
     "parallel_limit": 2,
     "download_mode": "parallel",
-    "auto_clipboard": True,
-    "clipboard_interval": 3000,
+    "auto_clipboard": False,  # opt-in: reading the clipboard is not free
+    "clipboard_interval": 1000,  # ms between polls while the feature is on
     "default_resolution": "720",
     "default_audio_only": False,
     "download_path": DEFAULT_DOWNLOAD_DIR,

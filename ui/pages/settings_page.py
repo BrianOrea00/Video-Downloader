@@ -94,6 +94,7 @@ class SettingsPage(QWidget):
         col.setSpacing(px(16))
 
         col.addWidget(self._download_card())
+        col.addWidget(self._clipboard_card())
         col.addWidget(self._cookies_card())
         col.addWidget(self._appearance_card())
         col.addWidget(self._about_card())
@@ -167,6 +168,39 @@ class SettingsPage(QWidget):
         self.audio_only.toggled.connect(lambda v: self._set("default_audio_only", v))
         form.addRow(self._label("Audio only", audio_help), self.audio_only)
         return card
+
+    def _clipboard_card(self) -> QFrame:
+        card, form = self._card("CLIPBOARD")
+
+        self.auto_clipboard = QCheckBox("Watch the clipboard for links")
+        self.auto_clipboard.setAccessibleName("Auto-detect links copied to the clipboard")
+        self.auto_clipboard.setChecked(bool(self.settings.get("auto_clipboard", False)))
+        self.auto_clipboard.toggled.connect(self._on_auto_clipboard)
+        form.addRow(
+            self._label(
+                "Auto-detect links",
+                "Fills the URL field when you copy a supported link. Off by default.",
+            ),
+            self.auto_clipboard,
+        )
+
+        self.clipboard_interval = QComboBox()
+        for label, value in (("0.5 s", 500), ("1 s", 1000), ("2 s", 2000), ("5 s", 5000)):
+            self.clipboard_interval.addItem(label, value)
+        self._select(
+            self.clipboard_interval, int(self.settings.get("clipboard_interval", 1000)))
+        self.clipboard_interval.setEnabled(self.auto_clipboard.isChecked())
+        self.clipboard_interval.currentIndexChanged.connect(
+            lambda: self._set("clipboard_interval", self.clipboard_interval.currentData()))
+        form.addRow(
+            self._label("Check every", "How often the clipboard is read while the app runs."),
+            self.clipboard_interval,
+        )
+        return card
+
+    def _on_auto_clipboard(self, enabled: bool) -> None:
+        self.clipboard_interval.setEnabled(enabled)
+        self._set("auto_clipboard", enabled)
 
     def _cookies_card(self) -> QFrame:
         card, form = self._card("COOKIES")
