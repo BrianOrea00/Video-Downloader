@@ -10,7 +10,14 @@ import config
 from logger import logger
 from persistence import load_settings
 from ui.main_window import MainWindow
-from ui.theme import DEFAULT_FAMILY, DEFAULT_MODE, DEFAULT_UI_SCALE, apply_theme, set_ui_scale
+from ui.theme import (
+    DEFAULT_FAMILY,
+    DEFAULT_MODE,
+    DEFAULT_UI_SCALE,
+    apply_theme,
+    set_motion,
+    set_ui_scale,
+)
 
 
 def _install_excepthook() -> None:
@@ -61,6 +68,7 @@ def main() -> int:
 
     settings = load_settings()
     set_ui_scale(float(settings.get("ui_scale", DEFAULT_UI_SCALE)))
+    set_motion(not settings.get("reduce_motion", False))
     apply_theme(app,
                 settings.get("theme_family", DEFAULT_FAMILY),
                 settings.get("theme", DEFAULT_MODE))

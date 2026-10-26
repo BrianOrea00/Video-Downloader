@@ -194,6 +194,16 @@ def set_ui_scale(scale: float) -> None:
     _state["scale"] = max(0.5, float(scale))
 
 
+def set_motion(enabled: bool) -> None:
+    """Turn the 120-150 ms state animations on or off (the user preference)."""
+    _state["motion"] = bool(enabled)
+
+
+def motion_enabled() -> bool:
+    """Whether state animations should run. Decorative motion never exists."""
+    return bool(_state["motion"])
+
+
 def repolish(widget) -> None:
     """Re-apply the stylesheet after a dynamic property changed.
 
@@ -254,7 +264,12 @@ METRICS = {
 }
 
 # Tracks the active scale and theme so widget code can pull values on demand.
-_state = {"scale": BASE_UI_SCALE, "family": DEFAULT_FAMILY, "mode": DEFAULT_MODE}
+_state = {
+    "scale": BASE_UI_SCALE,
+    "family": DEFAULT_FAMILY,
+    "mode": DEFAULT_MODE,
+    "motion": True,
+}
 
 # QSS template. ``@{n}`` is a design-time pixel value scaled by :func:`px`;
 # ``$name`` is a colour token from :data:`THEMES`. Hairline borders stay 1px.

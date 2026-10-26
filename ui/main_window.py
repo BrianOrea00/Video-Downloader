@@ -35,6 +35,7 @@ from ui.theme import (
     apply_theme,
     flip_mode,
     px,
+    set_motion,
 )
 
 TITLES = {
@@ -103,7 +104,7 @@ class MainWindow(QMainWindow):
             "settings": self.settings_page,
         }
         self.queue_page.download_completed.connect(self._refresh_current)
-        self.settings_page.settings_changed.connect(self.queue_page.apply_defaults)
+        self.settings_page.settings_changed.connect(self._on_settings_changed)
         self.settings_page.theme_changed.connect(self.set_theme)
         for page in self.pages.values():
             self.stack.addWidget(page)
@@ -237,6 +238,10 @@ class MainWindow(QMainWindow):
         self._refresh_current()
         self._sync_theme_button()
         self.sidebar.refresh_icons()
+
+    def _on_settings_changed(self) -> None:
+        set_motion(not self.settings.get("reduce_motion", False))
+        self.queue_page.apply_defaults()
 
     def toggle_theme(self) -> None:
         """Quick toggle: keep the family, flip dark/light."""

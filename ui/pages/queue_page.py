@@ -10,12 +10,22 @@ import logging
 import os
 from urllib.parse import urlparse
 
-from PySide6.QtCore import QSize, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtCore import (
+    QEasingCurve,
+    QPropertyAnimation,
+    QSize,
+    Qt,
+    QThread,
+    QTimer,
+    QUrl,
+    Signal,
+)
 from PySide6.QtGui import QDesktopServices, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFileDialog,
     QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -237,6 +247,7 @@ class QueueRow(QFrame):
         self.progress = QProgressBar()
         self.progress.setObjectName("RowProgress")
         self.progress.setRange(0, 100)
+        self.progress.setValue(0)   # Qt defaults to -1, which animates as a flash
         self.progress.setTextVisible(False)
         self.progress.setFixedHeight(px(METRICS["row_progress"]))
         main.addWidget(self.progress)
@@ -346,10 +357,27 @@ class QueueRow(QFrame):
             self.play.emit(self.item)
         super().mouseDoubleClickEvent(event)
 
+    def _progress_animation(self) -> QPropertyAnimation:
+        animation = getattr(self, "_progress_anim", None)
+        if animation is None:
+            animation = QPropertyAnimation(self.progress, b"value", self)
+            animation.setDuration(150)   # short: it reports, it does not perform
+            animation.setEasingCurve(QEasingCurve.Linear)
+            self._progress_anim = animation
+        return animation
+
     def set_progress(self, percent: float, data: dict) -> None:
         self.progress.setVisible(True)
         self.stats.setVisible(True)
-        self.progress.setValue(int(max(0.0, min(100.0, percent))))
+        target = int(max(0.0, min(100.0, percent)))
+        if ui_theme.motion_enabled() and self.progress.value() != target:
+            animation = self._progress_animation()
+            animation.stop()
+            animation.setStartValue(self.progress.value())
+            animation.setEndValue(target)
+            animation.start()
+        else:
+            self.progress.setValue(target)
         parts = [f"{percent:.0f}%"]
         if data.get("_speed_str"):
             parts.append(data["_speed_str"])
@@ -1057,6 +1085,16 @@ class QueuePage(QWidget):
 
     def _make_row(self, item: DownloadItem) -> QueueRow:
         row = QueueRow(item)
+        if ui_theme.motion_enabled():
+            fade = QGraphicsOpacityEffect(row)
+            fade.setOpacity(0.0)
+            row.setGraphicsEffect(fade)
+            animation = QPropertyAnimation(fade, b"opacity", row)
+            animation.setDuration(120)
+            animation.setStartValue(0.0)
+            animation.setEndValue(1.0)
+            animation.finished.connect(lambda r=row: r.setGraphicsEffect(None))
+            animation.start()
         row.open_folder.connect(self.open_folder)
         row.play.connect(self.play_item)
         row.cancel.connect(lambda i: self.stop())

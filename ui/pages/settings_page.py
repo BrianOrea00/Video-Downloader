@@ -234,6 +234,15 @@ class SettingsPage(QWidget):
         self.scale.currentIndexChanged.connect(
             lambda: self._set("ui_scale", self.scale.currentData()))
         form.addRow(self._label("Interface scale", "Applied after a restart."), self.scale)
+
+        self.reduce_motion = QCheckBox("Enabled")
+        self.reduce_motion.setAccessibleName("Reduce motion")
+        self.reduce_motion.setChecked(bool(self.settings.get("reduce_motion", False)))
+        self.reduce_motion.toggled.connect(lambda v: self._set("reduce_motion", v))
+        form.addRow(
+            self._label("Reduce motion", "Turns off the progress and fade animations."),
+            self.reduce_motion,
+        )
         return card
 
     # -- helpers -----------------------------------------------------------
