@@ -37,7 +37,7 @@ from queue_manager import QueueManager
 from queue_runner import QueueRunner
 from ui import icons
 from ui import theme as ui_theme
-from ui.theme import METRICS, px
+from ui.theme import METRICS, px, repolish
 from url_validator import validate_url
 from utils import ffmpeg_available
 
@@ -205,54 +205,40 @@ class QueueRow(QFrame):
         super().__init__(parent)
         self.item = item
         self.setObjectName("Row")
-        if item.status is DownloadStatus.DOWNLOADING:
-            self.setObjectName("RowActive")
 
         row = QHBoxLayout(self)
         row.setContentsMargins(px(12), px(10), px(12), px(10))
         row.setSpacing(px(12))
 
-        tile = QLabel()
-        tile.setPixmap(icons.pixmap(
-            "music" if item.audio_only else "video", 16,
-            "muted" if item.status is DownloadStatus.COMPLETED else "gray_light",
-        ))
-        tile.setObjectName("RowTile")
-        tile.setFixedSize(px(METRICS["row_tile_w"]), px(METRICS["row_tile_h"]))
-        tile.setAlignment(Qt.AlignCenter)
-        row.addWidget(tile)
+        self.tile = QLabel()
+        self.tile.setObjectName("RowTile")
+        self.tile.setFixedSize(px(METRICS["row_tile_w"]), px(METRICS["row_tile_h"]))
+        self.tile.setAlignment(Qt.AlignCenter)
+        row.addWidget(self.tile)
 
         main = QVBoxLayout()
         main.setSpacing(px(3))
-        self.title_label = ElidedLabel(item.title)
-        if item.status is DownloadStatus.COMPLETED:
-            self.title_label.setStyleSheet(f"color: {ui_theme.color('muted')};")
+        self.title_label = ElidedLabel()
         main.addWidget(self.title_label)
 
         meta = QHBoxLayout()
         meta.setSpacing(px(6))
-        res_text = "MP3" if item.audio_only else f"{item.resolution}p"
-        meta.addWidget(_chip(res_text))
-        label, token = STATUS_META.get(item.status, STATUS_META[DownloadStatus.PENDING])
-        status = QLabel(f"\u25cf {label}")
-        status.setStyleSheet(f"color: {ui_theme.color(token)}; font-size: {ui_theme.px(10)}px;")
-        meta.addWidget(status)
+        self.res_chip = _chip("")
+        meta.addWidget(self.res_chip)
+        self.status_label = QLabel()
+        meta.addWidget(self.status_label)
         meta.addStretch(1)
         main.addLayout(meta)
 
-        if item.status is DownloadStatus.FAILED and item.message:
-            reason = ElidedLabel(item.message)
-            reason.setStyleSheet(
-                f"color: {ui_theme.color('error')}; font-size: {ui_theme.px(10)}px;"
-            )
-            main.addWidget(reason)
+        self.reason = ElidedLabel("")
+        self.reason.setVisible(False)
+        main.addWidget(self.reason)
 
         self.progress = QProgressBar()
         self.progress.setObjectName("RowProgress")
         self.progress.setRange(0, 100)
         self.progress.setTextVisible(False)
         self.progress.setFixedHeight(px(METRICS["row_progress"]))
-        self.progress.setVisible(item.status is DownloadStatus.DOWNLOADING)
         main.addWidget(self.progress)
 
         self.stats = QLabel("")
@@ -260,31 +246,81 @@ class QueueRow(QFrame):
             f"{ui_theme.mono_css()} color: {ui_theme.color('gray_light')};"
             f" font-size: {ui_theme.px(11)}px;"
         )
-        self.stats.setVisible(item.status is DownloadStatus.DOWNLOADING)
+        self.stats.setVisible(False)
         main.addWidget(self.stats)
 
         row.addLayout(main, 1)
 
-        actions = QHBoxLayout()
-        actions.setSpacing(px(6))
+        self.actions = QHBoxLayout()
+        self.actions.setSpacing(px(6))
+        row.addLayout(self.actions)
+
+        self.update_item(item)
+
+    def update_item(self, item: DownloadItem) -> None:
+        """Repaint an existing row in place; keeps focus instead of rebuilding."""
+        self.item = item
+        active = item.status is DownloadStatus.DOWNLOADING
+        object_name = "RowActive" if active else "Row"
+        if self.objectName() != object_name:
+            self.setObjectName(object_name)
+            repolish(self)
+
+        self.tile.setPixmap(icons.pixmap(
+            "music" if item.audio_only else "video", 16,
+            "muted" if item.status is DownloadStatus.COMPLETED else "gray_light",
+        ))
+        self.title_label.setText(item.title)
+        style = f"color: {ui_theme.color('muted')};" if item.status is DownloadStatus.COMPLETED else ""
+        self.title_label.setStyleSheet(style)
+        self.res_chip.setText("MP3" if item.audio_only else f"{item.resolution}p")
+
+        label, token = STATUS_META.get(item.status, STATUS_META[DownloadStatus.PENDING])
+        self.status_label.setText(f"\u25cf {label}")
+        self.status_label.setStyleSheet(
+            f"color: {ui_theme.color(token)}; font-size: {ui_theme.px(10)}px;"
+        )
+
+        failed = item.status is DownloadStatus.FAILED and bool(item.message)
+        self.reason.setVisible(failed)
+        if failed:
+            self.reason.setText(item.message)
+            self.reason.setStyleSheet(
+                f"color: {ui_theme.color('error')}; font-size: {ui_theme.px(10)}px;"
+            )
+
+        self.progress.setVisible(active)
+        if not active:
+            self.stats.setVisible(False)
+
+        self._rebuild_actions()
+
+    def _rebuild_actions(self) -> None:
+        while self.actions.count():
+            child = self.actions.takeAt(0)
+            widget = child.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+
+        item = self.item
         if item.status is DownloadStatus.COMPLETED and item.filename:
-            actions.addWidget(self._text_button(
+            self.actions.addWidget(self._text_button(
                 "Play", "Play file", lambda: self.play.emit(self.item)))
-        actions.addWidget(self._icon_button(
+        self.actions.addWidget(self._icon_button(
             "folder", "Open folder", lambda: self.open_folder.emit(self.item)))
         if item.status is DownloadStatus.DOWNLOADING:
-            actions.addWidget(self._icon_button(
+            self.actions.addWidget(self._icon_button(
                 "x", "Cancel this download", lambda: self.cancel.emit(self.item)))
         if item.status is DownloadStatus.PAUSED:
-            actions.addWidget(self._text_button(
+            self.actions.addWidget(self._text_button(
                 "Resume", "Resume download", lambda: self.resume.emit(self.item)))
         if item.status is DownloadStatus.FAILED:
-            actions.addWidget(self._text_button(
+            self.actions.addWidget(self._text_button(
                 "Retry", "Retry download", lambda: self.resume.emit(self.item)))
-        actions.addWidget(self._text_button(
+        self.actions.addWidget(self._text_button(
             "Remove", "Remove from queue (the file is kept)",
             lambda: self.remove.emit(self.item)))
-        row.addLayout(actions)
 
     def _icon_button(self, asset: str, tip: str, slot) -> QPushButton:
         button = QPushButton()
@@ -334,6 +370,7 @@ class QueuePage(QWidget):
         self.settings = settings
         self.runner = QueueRunner(self)
         self._rows: dict[int, QueueRow] = {}
+        self._empty_box: QWidget | None = None
         self._preview_info: dict | None = None
         self._preview_url: str | None = None
         self._info_worker: InfoWorker | None = None
@@ -952,25 +989,44 @@ class QueuePage(QWidget):
 
     # -- rendering ---------------------------------------------------------
     def refresh(self) -> None:
-        self._rows.clear()
-        self._clear_layout(self.active_list)
-        self._clear_layout(self.queue_list)
-
         items = sorted(self.manager.snapshot(), key=lambda i: STATUS_ORDER.get(i.status, 3))
+        alive = {id(item) for item in items}
+
+        # Keyed update: rows that survive keep their identity, focus and row
+        # widgets; only rows whose items disappeared are destroyed.
+        for key in list(self._rows):
+            if key not in alive:
+                row = self._rows.pop(key)
+                row.setParent(None)
+                row.deleteLater()
+
         active = [i for i in items if i.status is DownloadStatus.DOWNLOADING]
         rest = [i for i in items if i.status is not DownloadStatus.DOWNLOADING]
 
-        for item in active:
-            self.active_list.addWidget(self._make_row(item))
-        for item in rest:
-            self.queue_list.addWidget(self._make_row(item))
+        for layout, group in ((self.active_list, active), (self.queue_list, rest)):
+            for item in group:
+                row = self._rows.get(id(item))
+                if row is None:
+                    row = self._make_row(item)
+                else:
+                    row.update_item(item)
+                layout.removeWidget(row)   # re-add to apply the new order
+                layout.addWidget(row)
 
         # An empty section is noise: hide its heading along with it.
         self.active_section.setVisible(bool(active))
         self.queue_section.setVisible(bool(rest))
 
-        if not items:
-            self.queue_list.addWidget(self._empty_state())
+        if items:
+            if self._empty_box is not None:
+                self.queue_list.removeWidget(self._empty_box)
+                self._empty_box.setVisible(False)
+        else:
+            if self._empty_box is None:
+                self._empty_box = self._empty_state()
+            self.queue_list.removeWidget(self._empty_box)
+            self.queue_list.addWidget(self._empty_box)
+            self._empty_box.setVisible(True)
 
         self._update_chips()
         running = self.runner.is_running()

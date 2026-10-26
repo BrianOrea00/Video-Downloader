@@ -48,3 +48,5 @@
 - **Storage meter is live**: `MainWindow._update_storage()` calls `shutil.disk_usage(download_path)` on page change and after a finished download (via `_refresh_current`); it is never polled. The sidebar bar shows the used fraction, the label the free space, and both carry the folder as a tooltip.
 
 - **Library pages have one owner for order and status** (`ui/pages/media_page.py`): `_sorted_entries()` applies the header sort combo (Newest/Oldest/Largest/Name, persisted as `library_sort`), `_render()` alone writes the status line ("3 videos · 5.7 MB", no match, empty folder) and switches a `QStackedWidget` between the list and the real empty panel. Play/Reveal/Delete are header buttons gated by the selection; the context menu is the shortcut, not the only path.
+
+- **Queue refresh is keyed, never clear-and-rebuild**: `QueuePage._rows` maps `id(DownloadItem)` → `QueueRow`; `QueueRow.update_item()` repaints labels/tile/reason/actions in place and `refresh()` only destroys rows whose item disappeared, then re-adds survivors in the new order. Row progress survives a refresh; focus and scroll position are not thrown away on every status change.
