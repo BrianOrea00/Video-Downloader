@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+import yt_dlp
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import engine
 from config import APP_VERSION, DATA_DIR, RESOLUTIONS
 from downloader import Downloader
 from persistence import save_settings
@@ -63,6 +65,23 @@ class CookieTestWorker(QThread):
             self.done.emit(False, f"Cookie test failed: {exc}")
 
 
+class EngineUpdateWorker(QThread):
+    """Downloads and verifies a newer yt-dlp wheel off the GUI thread."""
+
+    done = Signal(bool, str)  # (ok, message)
+
+    def run(self) -> None:
+        try:
+            version = engine.update()
+        except Exception as exc:  # noqa: BLE001 - report, never crash the app
+            self.done.emit(False, f"Update failed: {exc}")
+            return
+        if version:
+            self.done.emit(True, f"Updated to {version}. Restart to use it.")
+        else:
+            self.done.emit(True, "The engine is already up to date.")
+
+
 def _desc(text: str) -> QLabel:
     label = QLabel(text)
     label.setObjectName("FormHelp")
@@ -78,6 +97,9 @@ class SettingsPage(QWidget):
         super().__init__(parent)
         self.settings = settings
         self._test_worker: CookieTestWorker | None = None
+        self._engine_worker: EngineUpdateWorker | None = None
+        self._engine_version = yt_dlp.version.__version__
+        self._engine_swapped = engine.active_version() == self._engine_version
         self._build()
 
     # -- construction ------------------------------------------------------
@@ -97,6 +119,7 @@ class SettingsPage(QWidget):
         col.addWidget(self._clipboard_card())
         col.addWidget(self._cookies_card())
         col.addWidget(self._appearance_card())
+        col.addWidget(self._engine_card())
         col.addWidget(self._about_card())
 
         # Every control saves itself: there is no form-level commit step.
@@ -280,6 +303,36 @@ class SettingsPage(QWidget):
         )
         return card
 
+    def _engine_card(self) -> QFrame:
+        card, form = self._card("DOWNLOAD ENGINE")
+
+        version = QLabel(self._engine_version)
+        version.setObjectName("PathLabel")
+        version.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow(QLabel("yt-dlp"), version)
+
+        source = QLabel(
+            "Installed in the data folder" if self._engine_swapped
+            else "Bundled with this release"
+        )
+        source.setObjectName("FormHelp")
+        form.addRow(self._label("Source", "Sites change often; a newer engine fixes breakage."), source)
+
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(px(10))
+        self.engine_btn = QPushButton("Check for updates")
+        self.engine_btn.setToolTip("Downloads a newer yt-dlp wheel from PyPI and verifies its SHA256")
+        self.engine_btn.clicked.connect(self._check_engine)
+        self.engine_status = QLabel("")
+        self.engine_status.setObjectName("FormHelp")
+        self.engine_status.setWordWrap(True)
+        row_layout.addWidget(self.engine_btn)
+        row_layout.addWidget(self.engine_status, 1)
+        form.addRow(row)
+        return card
+
     def _about_card(self) -> QFrame:
         card, form = self._card("ABOUT")
         version = QLabel(APP_VERSION)
@@ -398,6 +451,21 @@ class SettingsPage(QWidget):
         self._test_worker = CookieTestWorker(cookie_settings, self)
         self._test_worker.done.connect(self._on_cookie_result)
         self._test_worker.start()
+
+    def _check_engine(self) -> None:
+        if self._engine_worker is not None and self._engine_worker.isRunning():
+            return
+        self.engine_btn.setEnabled(False)
+        self.engine_status.setText("Checking PyPI\u2026")
+        self._engine_worker = EngineUpdateWorker(self)
+        self._engine_worker.done.connect(self._on_engine_result)
+        self._engine_worker.start()
+
+    def _on_engine_result(self, ok: bool, message: str) -> None:
+        self.engine_btn.setEnabled(True)
+        self.engine_status.setText(message)
+        if not ok:
+            QMessageBox.warning(self, "Engine update", message)
 
     def _on_cookie_result(self, ok: bool, message: str) -> None:
         self.cookie_status.setText(message)

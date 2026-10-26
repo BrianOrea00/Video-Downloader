@@ -59,7 +59,15 @@ an initial reply within seven days.
 
 ## Updates
 
-There is no self-update in the 1.0.x series: new versions are published as
-releases and the bundled engine changes only when you install one. If an
-in-app engine updater is added later, it will fetch the official `yt-dlp` wheel
-from PyPI and check its SHA256 digest from the same JSON response before use.
+The application itself does not self-update: new versions are published as
+releases. Only the download engine can be refreshed from Settings → Download
+Engine, and that path is deliberately narrow:
+
+- the wheel comes from `https://pypi.org/pypi/yt-dlp/json` for the version that
+  response advertises;
+- the SHA256 digest from the same response must match the downloaded bytes, or
+  nothing is unpacked;
+- the archive is unpacked into `<data>/engine/<version>/` and checked to contain
+  only the `yt_dlp` package, with no absolute or `..` paths;
+- `current.json` is replaced atomically, and a version that fails to import is
+  discarded at startup in favour of the bundled copy.

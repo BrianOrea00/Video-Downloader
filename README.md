@@ -180,6 +180,7 @@ Go to **Settings → Cookies** and choose one of:
 - Downloads run in a background thread pool so the UI never freezes; worker threads report back over Qt signals
 - Queue state lives in `queue_manager.py`; a stop request cancels every active downloader so nothing is left half-running
 - The queue, history, and settings are stored as local JSON files written atomically under a single lock
+- Settings → Download Engine can fetch a newer `yt-dlp` wheel from PyPI; its SHA256 is verified before it is unpacked, and the app falls back to the bundled copy if it cannot be imported
 - The visual system is defined once in `ui/theme.py` as semantic colour tokens rendered to a QSS stylesheet; every family shares the same token names, so widgets never hardcode a hex value
 
 ---

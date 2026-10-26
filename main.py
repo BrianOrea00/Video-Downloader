@@ -8,17 +8,9 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 import config
+import engine
 from logger import logger
 from persistence import load_settings
-from ui.main_window import MainWindow
-from ui.theme import (
-    DEFAULT_FAMILY,
-    DEFAULT_MODE,
-    DEFAULT_UI_SCALE,
-    apply_theme,
-    set_motion,
-    set_ui_scale,
-)
 from utils import resource_path
 
 
@@ -49,6 +41,20 @@ def _install_excepthook() -> None:
 
 def main() -> int:
     logger.info("Starting Video Downloader")
+    # Before any module imports yt_dlp: a newer engine on disk wins over the
+    # bundled copy. Everything under ui/ imports it transitively, so the UI
+    # imports below must stay inside main().
+    engine.activate()
+    from ui.main_window import MainWindow
+    from ui.theme import (
+        DEFAULT_FAMILY,
+        DEFAULT_MODE,
+        DEFAULT_UI_SCALE,
+        apply_theme,
+        set_motion,
+        set_ui_scale,
+    )
+
     app = QApplication(sys.argv)
     app.setApplicationName("Video Downloader")
     app.setApplicationVersion(config.APP_VERSION)
