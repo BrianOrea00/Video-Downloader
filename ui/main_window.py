@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -107,6 +108,10 @@ class MainWindow(QMainWindow):
         column.addWidget(self.stack, 1)
         row.addWidget(content, 1)
 
+        # Application-wide keys; page-local ones live on the pages themselves.
+        QShortcut(QKeySequence("Ctrl+T"), self, activated=self.toggle_theme)
+        QShortcut(QKeySequence.Find, self, activated=self._focus_search)
+
         self.show_page("queue")
 
     # -- top bar -----------------------------------------------------------
@@ -124,6 +129,7 @@ class MainWindow(QMainWindow):
         self.badge = QLabel("0 items")
         self.badge.setObjectName("Badge")
         self.badge.setAccessibleName("Queued items")
+        self.badge.setVisible(False)   # only shown when something is queued
 
         self.theme_btn = QPushButton()
         self.theme_btn.setObjectName("ThemeButton")
@@ -191,3 +197,14 @@ class MainWindow(QMainWindow):
     # -- badge -------------------------------------------------------------
     def set_badge(self, count: int) -> None:
         self.badge.setText(f"{count} item" if count == 1 else f"{count} items")
+        self.badge.setVisible(count > 0)
+
+    def _focus_search(self) -> None:
+        """Ctrl+F: the library search on media pages, the URL field elsewhere."""
+        search = getattr(self.stack.currentWidget(), "search", None)
+        if search is not None:
+            search.setFocus()
+            search.selectAll()
+            return
+        self.queue_page.url_input.setFocus()
+        self.queue_page.url_input.selectAll()
