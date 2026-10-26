@@ -4,6 +4,7 @@ import os
 import sys
 
 from PySide6.QtCore import QLockFile
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 import config
@@ -18,6 +19,7 @@ from ui.theme import (
     set_motion,
     set_ui_scale,
 )
+from utils import resource_path
 
 
 def _install_excepthook() -> None:
@@ -50,6 +52,12 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Video Downloader")
     app.setApplicationVersion(config.APP_VERSION)
+    # Without these the dock/taskbar shows a generic Python icon and Linux
+    # launchers cannot match the window to the desktop entry.
+    app.setDesktopFileName("video-downloader")
+    icon = QIcon(resource_path("assets/appicon.png"))
+    if not icon.isNull():
+        app.setWindowIcon(icon)
     _install_excepthook()
 
     # One process per user data directory: two instances would race the
