@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import shutil
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QByteArray, QSize, Qt
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -114,7 +114,43 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+T"), self, activated=self.toggle_theme)
         QShortcut(QKeySequence.Find, self, activated=self._focus_search)
 
-        self.show_page("queue")
+        self._restore_window_state()
+        last_page = self.settings.get("last_page", "queue")
+        self.show_page(last_page if last_page in self.pages else "queue")
+
+    def _restore_window_state(self) -> None:
+        """Bring back size, maximised state and page, then keep them on screen."""
+        geometry = self.settings.get("window_geometry")
+        if geometry:
+            self.restoreGeometry(QByteArray.fromBase64(geometry.encode("ascii")))
+            self._clamp_to_screen()
+        state = self.settings.get("window_state")
+        if state:
+            self.restoreState(QByteArray.fromBase64(state.encode("ascii")))
+
+    def _clamp_to_screen(self) -> None:
+        screen = QGuiApplication.screenAt(self.frameGeometry().center())
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        frame = self.frameGeometry()
+        if available.contains(frame):
+            return
+        width = min(frame.width(), available.width())
+        height = min(frame.height(), available.height())
+        x = min(max(frame.x(), available.x()), available.right() - width + 1)
+        y = min(max(frame.y(), available.y()), available.bottom() - height + 1)
+        self.setGeometry(x, y, width, height)
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        self.settings["window_geometry"] = bytes(
+            self.saveGeometry().toBase64()).decode("ascii")
+        self.settings["window_state"] = bytes(
+            self.saveState().toBase64()).decode("ascii")
+        save_settings(self.settings)
+        super().closeEvent(event)
 
     # -- top bar -----------------------------------------------------------
     def _build_topbar(self) -> QWidget:
@@ -154,6 +190,7 @@ class MainWindow(QMainWindow):
         self.title_label.setText(TITLES.get(key) or getattr(page, "title", ""))
         self.sidebar.set_active(key)
         self.current_key = key
+        self.settings["last_page"] = key
         self._update_storage()
 
     def _update_storage(self) -> None:
