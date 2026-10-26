@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 
 RESOLUTIONS = ["144", "240", "360", "480", "720", "1080"]
-DEFAULT_PATH = ""
 
 APP_VERSION = "1.0.0"
 APP_DIR_NAME = "Video-Downloader"
@@ -70,28 +69,3 @@ DEFAULT_SETTINGS = {
     "sidebar_collapsed": False  # Icon-only sidebar rail
 }
 
-# These are now just for reference - CustomTkinter custom theme handles colors
-THEMES = {
-    "light": {
-        "bg": "#F2F5F3",
-        "sidebar_bg": "#E8EDE9",
-        "fg": "#1A2E28",
-        "button_bg": "#2BB2A9",
-        "button_fg": "#1A2E28",
-        "entry_bg": "#E8EDE9",
-        "entry_fg": "#1A2E28",
-        "progress_bg": "#C9D4CB",
-        "selected_bg": "#A8D8D5"
-    },
-    "dark": {
-        "bg": "#000103",
-        "sidebar_bg": "#0F3029",
-        "fg": "#FFFFFF",
-        "button_bg": "#2BB2A9",
-        "button_fg": "#FFFFFF",
-        "entry_bg": "#0F3029",
-        "entry_fg": "#FFFFFF",
-        "progress_bg": "#1B7774",
-        "selected_bg": "#2BB2A9"
-    }
-}
