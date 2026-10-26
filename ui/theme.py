@@ -8,11 +8,17 @@ palette shares the same token names so widgets never reference a raw hex value.
 """
 from __future__ import annotations
 
+import logging
+import os
 import re
 from string import Template
 
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
+
+from utils import resource_path
+
+logger = logging.getLogger(__name__)
 
 # Semantic tokens per theme. Keys are shared across both themes.
 THEMES: dict[str, dict[str, dict[str, str]]] = {
@@ -478,8 +484,35 @@ def color(key: str) -> str:
     return tokens(_state["family"], _state["mode"]).get(key, "#ff00ff")
 
 
+_fonts_loaded = False
+
+
+def _load_bundled_fonts() -> None:
+    """Register the faces shipped in ``assets/fonts`` before anything asks.
+
+    A clean machine has no Monocraft installed; the identity must not depend on
+    the user having run a font installer.
+    """
+    global _fonts_loaded
+    if _fonts_loaded:
+        return
+    _fonts_loaded = True
+    path = resource_path("assets/fonts/Monocraft.ttf")
+    if not os.path.exists(path):
+        logger.warning("Bundled Monocraft missing at %s", path)
+        return
+    font_id = QFontDatabase.addApplicationFont(path)
+    families = QFontDatabase.applicationFontFamilies(font_id) if font_id != -1 else []
+    if MONO_FONT not in families:
+        logger.warning(
+            "Bundled Monocraft did not resolve (got %s); falling back to %s",
+            families or "nothing", FALLBACK_MONO,
+        )
+
+
 def ui_family() -> str:
     """System UI sans, preferring the faces a release build bundles."""
+    _load_bundled_fonts()
     families = set(QFontDatabase.families())
     for name in UI_FONT_CANDIDATES:
         if name in families:
@@ -488,7 +521,8 @@ def ui_family() -> str:
 
 
 def mono_family() -> str:
-    """Monocraft when installed, otherwise the platform monospace face."""
+    """Monocraft when installed or bundled, otherwise the platform monospace."""
+    _load_bundled_fonts()
     families = set(QFontDatabase.families())
     return MONO_FONT if MONO_FONT in families else FALLBACK_MONO
 
