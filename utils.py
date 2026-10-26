@@ -1,7 +1,12 @@
+import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
+from urllib.parse import urlsplit
+
+_URL_RE = re.compile(r"https?://[^\s'\"<>)\]]+", re.IGNORECASE)
 
 
 def resource_path(relative: str) -> str:
@@ -17,6 +22,32 @@ def ffmpeg_available() -> bool:
     those choices instead of letting a download fail later.
     """
     return shutil.which("ffmpeg") is not None
+
+
+def redact_url(url: str) -> str:
+    """Host plus a short fingerprint instead of the full URL.
+
+    Logs are meant to be shareable, so a downloaded video's identity must not
+    be in them, while a fingerprint still lets two lines be correlated.
+    """
+    try:
+        parts = urlsplit(url if "://" in url else "https://" + url)
+    except ValueError:
+        return "unparsed-url"
+    host = parts.hostname or "unknown-host"
+    digest = hashlib.sha256(url.encode("utf-8", "replace")).hexdigest()[:8]
+    return f"{host}#{digest}"
+
+
+def redact_text(text: str) -> str:
+    """Redact every URL and the home directory in a log or error message."""
+    if not text:
+        return text
+    redacted = _URL_RE.sub(lambda match: redact_url(match.group(0)), text)
+    home = os.path.expanduser("~")
+    if home and home != "~":
+        redacted = redacted.replace(home, "~")
+    return redacted
 
 
 def detect_vlc() -> str | None:
