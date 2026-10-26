@@ -120,6 +120,43 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(len(manager), 1)
 
 
+class ReorderTests(unittest.TestCase):
+    def _manager(self):
+        manager, store = make_manager()
+        first = manager.add(DownloadItem(url="a", path="/d", title="a"))
+        second = manager.add(DownloadItem(url="b", path="/d", title="b"))
+        third = manager.add(DownloadItem(url="c", path="/d", title="c"))
+        return manager, store, (first, second, third)
+
+    def test_move_swaps_and_persists(self):
+        manager, store, (first, second, _) = self._manager()
+        self.assertTrue(manager.move(second, -1))
+        self.assertEqual([item.title for item in manager.snapshot()], ["b", "a", "c"])
+        self.assertEqual([row["title"] for row in store.queue], ["b", "a", "c"])
+
+    def test_move_clamps_at_both_ends(self):
+        manager, store, (first, _, third) = self._manager()
+        before = store.save_calls
+        self.assertFalse(manager.move(first, -1))
+        self.assertFalse(manager.move(third, 1))
+        self.assertEqual(store.save_calls, before)   # nothing moved, nothing saved
+
+    def test_completed_or_running_items_cannot_move(self):
+        manager, _, (first, second, third) = self._manager()
+        second.status = DownloadStatus.DOWNLOADING
+        self.assertFalse(manager.move(second, -1))
+        third.status = DownloadStatus.COMPLETED
+        self.assertFalse(manager.move(third, -1))
+        self.assertEqual([item.title for item in manager.snapshot()], ["a", "b", "c"])
+
+    def test_move_skips_immovable_neighbours(self):
+        manager, _, (_, second, third) = self._manager()
+        second.status = DownloadStatus.COMPLETED
+        self.assertTrue(manager.move(third, -1))
+        # The completed row is stepped over: the two runnable items swap.
+        self.assertEqual([item.title for item in manager.snapshot()], ["c", "b", "a"])
+
+
 class PersistenceTests(unittest.TestCase):
     def test_mutations_persist(self):
         manager, store = make_manager()

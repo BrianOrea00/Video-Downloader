@@ -102,6 +102,31 @@ class QueueManager:
         self.save()
         return True
 
+    def move(self, item: DownloadItem, delta: int) -> bool:
+        """Swap ``item`` with the nearest movable neighbour in that direction.
+
+        Only pending/paused items move, and completed/failed rows in between are
+        skipped, so the visible order stays the order they will run in.
+        """
+        with self._lock:
+            if item.status not in ACTIVE_STATUSES:
+                return False
+            try:
+                index = self._items.index(item)
+            except ValueError:
+                return False
+            step = 1 if delta > 0 else -1
+            target = index + step
+            while 0 <= target < len(self._items):
+                if self._items[target].status in ACTIVE_STATUSES:
+                    break
+                target += step
+            else:
+                return False
+            self._items[index], self._items[target] = self._items[target], self._items[index]
+        self.save()
+        return True
+
     def clear_completed(self) -> None:
         with self._lock:
             self._items = [

@@ -67,12 +67,14 @@ RESOLUTION_KBPS = {
 }
 AUDIO_KBPS = 192
 AUDIO_TRACK_KBPS = 128
-STATUS_ORDER = {
-    DownloadStatus.PENDING: 0,
+# Visual grouping only: downloading first, runnable next in run order, done
+# last. Sorting pending and paused separately would misrepresent run order.
+STATUS_RANK = {
+    DownloadStatus.DOWNLOADING: 0,
+    DownloadStatus.PENDING: 1,
     DownloadStatus.PAUSED: 1,
-    DownloadStatus.DOWNLOADING: 2,
-    DownloadStatus.COMPLETED: 4,
-    DownloadStatus.FAILED: 5,
+    DownloadStatus.COMPLETED: 2,
+    DownloadStatus.FAILED: 2,
 }
 
 
@@ -211,12 +213,16 @@ class QueueRow(QFrame):
     remove = Signal(object)
     play = Signal(object)
     pressed = Signal(object)
+    move_up = Signal(object)
+    move_down = Signal(object)
 
     def __init__(self, item: DownloadItem, parent=None) -> None:
         super().__init__(parent)
         self.item = item
         self._selected = False
         self._active = False
+        self._can_up = True
+        self._can_down = True
         self.setObjectName("Row")
         self.setCursor(Qt.PointingHandCursor)
 
@@ -349,9 +355,26 @@ class QueueRow(QFrame):
         if item.status is DownloadStatus.FAILED:
             self.actions.addWidget(self._text_button(
                 "Retry", "Retry download", lambda: self.resume.emit(self.item)))
+        if item.status in (DownloadStatus.PENDING, DownloadStatus.PAUSED):
+            self.move_up_btn = self._icon_button(
+                "arrow-move-up", "Move up", lambda: self.move_up.emit(self.item))
+            self.move_down_btn = self._icon_button(
+                "arrow-move-down", "Move down", lambda: self.move_down.emit(self.item))
+            self.actions.addWidget(self.move_up_btn)
+            self.actions.addWidget(self.move_down_btn)
         self.actions.addWidget(self._text_button(
             "Remove", "Remove from queue (the file is kept)",
             lambda: self.remove.emit(self.item)))
+        self.set_move_enabled(self._can_up, self._can_down)
+
+    def set_move_enabled(self, up: bool, down: bool) -> None:
+        """Called by the page, which is the only place that knows the order."""
+        self._can_up = up
+        self._can_down = down
+        if hasattr(self, "move_up_btn"):
+            self.move_up_btn.setEnabled(up)
+        if hasattr(self, "move_down_btn"):
+            self.move_down_btn.setEnabled(down)
 
     def _icon_button(self, asset: str, tip: str, slot) -> QPushButton:
         button = QPushButton()
@@ -1061,6 +1084,10 @@ class QueuePage(QWidget):
             self.manager.remove(index)
         self.refresh()
 
+    def _move_item(self, item: DownloadItem, delta: int) -> None:
+        if self.manager.move(item, delta):
+            self.refresh()
+
     def _index_of(self, item: DownloadItem) -> int | None:
         for index, candidate in enumerate(self.manager.snapshot()):
             if candidate is item:
@@ -1145,7 +1172,13 @@ class QueuePage(QWidget):
 
     # -- rendering ---------------------------------------------------------
     def refresh(self) -> None:
-        items = sorted(self.manager.snapshot(), key=lambda i: STATUS_ORDER.get(i.status, 3))
+        snapshot = self.manager.snapshot()
+        items = [
+            item for _, item in sorted(
+                enumerate(snapshot),
+                key=lambda pair: (STATUS_RANK.get(pair[1].status, 2), pair[0]),
+            )
+        ]
         alive = {id(item) for item in items}
 
         # Keyed update: rows that survive keep their identity, focus and row
@@ -1171,6 +1204,13 @@ class QueuePage(QWidget):
                     row.update_item(item)
                 layout.removeWidget(row)   # re-add to apply the new order
                 layout.addWidget(row)
+
+        movable = [item for item in rest if item.status in (
+            DownloadStatus.PENDING, DownloadStatus.PAUSED)]
+        for position, item in enumerate(movable):
+            row = self._rows.get(id(item))
+            if row is not None:
+                row.set_move_enabled(position > 0, position < len(movable) - 1)
 
         # An empty section is noise: hide its heading along with it.
         self.active_section.setVisible(bool(active))
@@ -1227,6 +1267,8 @@ class QueuePage(QWidget):
             animation.finished.connect(lambda r=row: r.setGraphicsEffect(None))
             animation.start()
         row.pressed.connect(self._set_selected)
+        row.move_up.connect(lambda item: self._move_item(item, -1))
+        row.move_down.connect(lambda item: self._move_item(item, 1))
         row.open_folder.connect(self.open_folder)
         row.play.connect(self.play_item)
         row.cancel.connect(lambda i: self.stop())
