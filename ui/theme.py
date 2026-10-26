@@ -412,6 +412,9 @@ _QSS_RAW = """
         background: $bg; border: 1px solid $border; border-radius: @{8}px;
     }
     #RowActive { border: 1px solid $accent; }
+    #RowSelected {
+        background: $hover; border: 1px solid $accent; border-radius: @{8}px;
+    }
     #RowTile {
         background: $bg; border: 1px solid $border; border-radius: @{4}px;
         color: $gray_light;

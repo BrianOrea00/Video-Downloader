@@ -210,11 +210,15 @@ class QueueRow(QFrame):
     resume = Signal(object)
     remove = Signal(object)
     play = Signal(object)
+    pressed = Signal(object)
 
     def __init__(self, item: DownloadItem, parent=None) -> None:
         super().__init__(parent)
         self.item = item
+        self._selected = False
+        self._active = False
         self.setObjectName("Row")
+        self.setCursor(Qt.PointingHandCursor)
 
         row = QHBoxLayout(self)
         row.setContentsMargins(px(12), px(10), px(12), px(10))
@@ -268,14 +272,30 @@ class QueueRow(QFrame):
 
         self.update_item(item)
 
+    def set_selected(self, selected: bool) -> None:
+        """Selection is visual only; it drives the Delete shortcut."""
+        if self._selected == selected:
+            return
+        self._selected = selected
+        self._apply_state()
+
+    def _apply_state(self) -> None:
+        """One owner for the row's dynamic object name.
+
+        Object names are exclusive, so selection has to be merged here rather
+        than set by two independent call sites.
+        """
+        name = "RowSelected" if self._selected else ("RowActive" if self._active else "Row")
+        if self.objectName() != name:
+            self.setObjectName(name)
+            repolish(self)
+
     def update_item(self, item: DownloadItem) -> None:
         """Repaint an existing row in place; keeps focus instead of rebuilding."""
         self.item = item
         active = item.status is DownloadStatus.DOWNLOADING
-        object_name = "RowActive" if active else "Row"
-        if self.objectName() != object_name:
-            self.setObjectName(object_name)
-            repolish(self)
+        self._active = active
+        self._apply_state()
 
         self.tile.setPixmap(icons.pixmap(
             "music" if item.audio_only else "video", 16,
@@ -352,6 +372,11 @@ class QueueRow(QFrame):
         button.clicked.connect(slot)
         return button
 
+    def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt override
+        if event.button() == Qt.LeftButton:
+            self.pressed.emit(self.item)
+        super().mousePressEvent(event)
+
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802 - Qt override
         if self.item.status is DownloadStatus.COMPLETED and self.item.filename:
             self.play.emit(self.item)
@@ -405,6 +430,7 @@ class QueuePage(QWidget):
         self._thumb_workers: set[ThumbWorker] = set()
         self._preview_workers: set[PreviewThumbWorker] = set()
         self._last_sanitized: str | None = None
+        self._selected: DownloadItem | None = None
 
         self.manager.load()
         self._build()
@@ -428,15 +454,63 @@ class QueuePage(QWidget):
             ("Ctrl+Return", self.start),
             ("Ctrl+Enter", self.start),
             ("Ctrl+.", self.stop),
-            ("Esc", self._clear_input),
+            ("Esc", self._escape),
+            ("Delete", self._delete_selected),
         ):
             shortcut = QShortcut(QKeySequence(sequence), self)
             shortcut.activated.connect(slot)
+
+        # Explicit order: the URL field, then its actions, then the options,
+        # then the queue controls. Rows follow in visual order.
+        chain = (
+            self.url_input, self.paste_btn, self.add_btn, self.audio_pill,
+            self.browse_btn, self.start_btn, self.stop_btn, self.clear_btn,
+        )
+        for first, second in zip(chain, chain[1:], strict=False):
+            QWidget.setTabOrder(first, second)
 
     def _clear_input(self) -> None:
         self.url_input.clear()
         self._hide_preview()
         self.url_input.setFocus()
+
+    def _escape(self) -> None:
+        """Esc drops the row selection first, then the URL field."""
+        if self._selected is not None:
+            self._set_selected(None)
+        else:
+            self._clear_input()
+
+    def _set_selected(self, item: DownloadItem | None) -> None:
+        self._selected = item
+        for row in self._rows.values():
+            row.set_selected(item is not None and row.item is item)
+
+    def _delete_selected(self) -> None:
+        """Delete removes the selected row; the file on disk is untouched."""
+        item = self._selected
+        if item is None:
+            self._notify("Select a row first \u2014 click it, then press Delete.")
+            return
+        if item.status is DownloadStatus.DOWNLOADING:
+            self._notify("Stop that download before removing it.", "error")
+            return
+        if self._confirm_remove(item):
+            self._set_selected(None)
+            self.remove_item(item)
+
+    def _confirm_remove(self, item: DownloadItem) -> bool:
+        """Destructive, so it is the one place a modal is still right."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("Remove from queue")
+        box.setText(f"Remove \u201c{item.title}\u201d from the queue?")
+        box.setInformativeText("The downloaded file is kept on disk.")
+        remove = box.addButton("Remove", QMessageBox.DestructiveRole)
+        box.addButton("Cancel", QMessageBox.RejectRole)
+        box.setDefaultButton(box.buttons()[-1])
+        box.exec()
+        return box.clickedButton() is remove
 
     def _build(self) -> None:
         outer = QVBoxLayout(self)
@@ -528,9 +602,9 @@ class QueuePage(QWidget):
         self.url_input.textChanged.connect(self._on_url_changed)
         input_row.addWidget(self.url_input, 1)
 
-        paste_btn = QPushButton("Paste")
-        paste_btn.clicked.connect(self.paste)
-        input_row.addWidget(paste_btn)
+        self.paste_btn = QPushButton("Paste")
+        self.paste_btn.clicked.connect(self.paste)
+        input_row.addWidget(self.paste_btn)
 
         self.add_btn = QPushButton("Add to Queue")
         self.add_btn.setObjectName("PrimaryButton")
@@ -590,9 +664,9 @@ class QueuePage(QWidget):
                 "ffmpeg was not found on PATH. Audio-only and MP4 merging need it."
             )
         path_row.addWidget(self.audio_pill)
-        browse = QPushButton("Browse")
-        browse.clicked.connect(self.browse)
-        path_row.addWidget(browse)
+        self.browse_btn = QPushButton("Browse")
+        self.browse_btn.clicked.connect(self.browse)
+        path_row.addWidget(self.browse_btn)
         layout.addLayout(path_row)
 
         self.preview = QFrame()
@@ -616,11 +690,11 @@ class QueuePage(QWidget):
         self.stop_btn.setIconSize(QSize(px(16), px(16)))
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop)
-        clear_btn = QPushButton("Clear Completed")
-        clear_btn.clicked.connect(self.clear_completed)
+        self.clear_btn = QPushButton("Clear Completed")
+        self.clear_btn.clicked.connect(self.clear_completed)
         actions.addWidget(self.start_btn)
         actions.addWidget(self.stop_btn)
-        actions.addWidget(clear_btn)
+        actions.addWidget(self.clear_btn)
         actions.addStretch(1)
         hint = QLabel("Enter adds \u00b7 Ctrl+\u21b5 starts")
         hint.setObjectName("FormHelp")
@@ -1028,6 +1102,9 @@ class QueuePage(QWidget):
                 row.setParent(None)
                 row.deleteLater()
 
+        if self._selected is not None and id(self._selected) not in alive:
+            self._selected = None
+
         active = [i for i in items if i.status is DownloadStatus.DOWNLOADING]
         rest = [i for i in items if i.status is not DownloadStatus.DOWNLOADING]
 
@@ -1095,6 +1172,7 @@ class QueuePage(QWidget):
             animation.setEndValue(1.0)
             animation.finished.connect(lambda r=row: r.setGraphicsEffect(None))
             animation.start()
+        row.pressed.connect(self._set_selected)
         row.open_folder.connect(self.open_folder)
         row.play.connect(self.play_item)
         row.cancel.connect(lambda i: self.stop())
