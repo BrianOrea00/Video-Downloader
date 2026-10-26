@@ -42,7 +42,7 @@ import thumb_cache
 from config import RESOLUTIONS
 from downloader import Downloader
 from models import DownloadItem, DownloadStatus
-from persistence import save_history
+from persistence import clear_history, load_history, save_history
 from queue_manager import QueueManager
 from queue_runner import QueueRunner
 from ui import icons
@@ -547,8 +547,8 @@ class QueuePage(QWidget):
         box.setText(f"Remove \u201c{item.title}\u201d from the queue?")
         box.setInformativeText("The downloaded file is kept on disk.")
         remove = box.addButton("Remove", QMessageBox.DestructiveRole)
-        box.addButton("Cancel", QMessageBox.RejectRole)
-        box.setDefaultButton(box.buttons()[-1])
+        cancel = box.addButton("Cancel", QMessageBox.RejectRole)
+        box.setDefaultButton(cancel)   # never default to the destructive choice
         box.exec()
         return box.clickedButton() is remove
 
@@ -732,9 +732,13 @@ class QueuePage(QWidget):
         self.stop_btn.clicked.connect(self.stop)
         self.clear_btn = QPushButton("Clear Completed")
         self.clear_btn.clicked.connect(self.clear_completed)
+        self.history_btn = QPushButton("Clear History")
+        self.history_btn.setToolTip("Remove every record from history.json")
+        self.history_btn.clicked.connect(self._clear_history)
         actions.addWidget(self.start_btn)
         actions.addWidget(self.stop_btn)
         actions.addWidget(self.clear_btn)
+        actions.addWidget(self.history_btn)
         actions.addStretch(1)
         hint = QLabel("Enter adds \u00b7 Ctrl+\u21b5 starts")
         hint.setObjectName("FormHelp")
@@ -1083,6 +1087,27 @@ class QueuePage(QWidget):
         if index is not None:
             self.manager.remove(index)
         self.refresh()
+
+    def _clear_history(self) -> None:
+        """Destructive, so it asks first; downloaded files are kept."""
+        entries = load_history()
+        if not entries:
+            self._notify("History is already empty.")
+            return
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("Clear history")
+        box.setText(f"Remove all {len(entries)} history entries?")
+        box.setInformativeText(
+            "This resets duplicate detection. Downloaded files are not touched.")
+        clear = box.addButton("Clear history", QMessageBox.DestructiveRole)
+        cancel = box.addButton("Cancel", QMessageBox.RejectRole)
+        box.setDefaultButton(cancel)   # never default to the destructive choice
+        box.exec()
+        if box.clickedButton() is not clear:
+            return
+        clear_history()
+        self._notify("Download history cleared.")
 
     def _move_item(self, item: DownloadItem, delta: int) -> None:
         if self.manager.move(item, delta):

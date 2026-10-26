@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 _write_lock = threading.RLock()
 
+# Duplicate detection only needs recent entries; the file must not grow forever.
+HISTORY_LIMIT = 1000
+
 
 def _read(path: str, default: Any) -> Any:
     """Read JSON, returning ``default`` for a missing, empty or corrupt file."""
@@ -69,13 +72,24 @@ def load_history() -> list[dict]:
 
 
 def save_history(entry: dict) -> None:
-    """Append one completed-download record, stamping a date if absent."""
+    """Append one completed-download record, stamping a date if absent.
+
+    The file keeps the most recent :data:`HISTORY_LIMIT` entries; older ones are
+    dropped so a daily user does not accumulate an unbounded history file.
+    """
     record = dict(entry)
     record.setdefault("date_added", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     with _write_lock:
         history = load_history()
         history.append(record)
+        if len(history) > HISTORY_LIMIT:
+            history = history[-HISTORY_LIMIT:]
         _write(HISTORY_FILE, history)
+
+
+def clear_history() -> None:
+    """Atomically empty the history (downloaded files are untouched)."""
+    _write(HISTORY_FILE, [])
 
 
 def load_settings() -> dict:

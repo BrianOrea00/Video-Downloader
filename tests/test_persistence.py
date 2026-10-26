@@ -76,6 +76,28 @@ class HistoryPersistenceTests(PersistenceTestBase):
         self.assertEqual(history[1]["date_added"], "fixed")
 
 
+class HistoryRetentionTests(PersistenceTestBase):
+    def test_history_is_capped_to_the_most_recent_entries(self):
+        original = persistence.HISTORY_LIMIT
+        persistence.HISTORY_LIMIT = 5
+        try:
+            for n in range(8):
+                persistence.save_history({"url": f"u{n}"})
+        finally:
+            persistence.HISTORY_LIMIT = original
+        history = persistence.load_history()
+        self.assertEqual(len(history), 5)
+        self.assertEqual(history[-1]["url"], "u7")   # newest kept
+        self.assertEqual(history[0]["url"], "u3")    # oldest dropped
+
+    def test_clear_history_keeps_the_queue(self):
+        persistence.save_queue([{"url": "a"}])
+        persistence.save_history({"url": "a"})
+        persistence.clear_history()
+        self.assertEqual(persistence.load_history(), [])
+        self.assertEqual(persistence.load_queue(), [{"url": "a"}])
+
+
 class SettingsPersistenceTests(PersistenceTestBase):
     def test_defaults_are_merged_for_missing_keys(self):
         Path(self.settings_file).write_text('{"theme": "light"}', encoding="utf-8")
