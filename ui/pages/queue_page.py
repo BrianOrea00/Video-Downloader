@@ -499,6 +499,18 @@ class QueuePage(QWidget):
             self._set_selected(None)
             self.remove_item(item)
 
+    def _ask(self, title: str, text: str, accept_label: str) -> bool:
+        """Decision prompt with named buttons, so the choice is never Yes/No."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle(title)
+        box.setText(text)
+        accept = box.addButton(accept_label, QMessageBox.AcceptRole)
+        cancel = box.addButton("Cancel", QMessageBox.RejectRole)
+        box.setDefaultButton(cancel)
+        box.exec()
+        return box.clickedButton() is accept
+
     def _confirm_remove(self, item: DownloadItem) -> bool:
         """Destructive, so it is the one place a modal is still right."""
         box = QMessageBox(self)
@@ -941,17 +953,19 @@ class QueuePage(QWidget):
 
         duplicate_kind, duplicate = self.manager.find_duplicate(url)
         if duplicate_kind == "queue":
-            if QMessageBox.question(
-                self, "Duplicate URL",
-                f"This URL is already in the queue (status: {duplicate.get('status')}).\n\nAdd again?",
-            ) != QMessageBox.Yes:
+            if not self._ask(
+                "Duplicate URL",
+                f"This URL is already in the queue (status: {duplicate.get('status')}).",
+                "Add anyway",
+            ):
                 self.url_input.clear()
                 return
         elif duplicate_kind == "history":
-            if QMessageBox.question(
-                self, "Previously downloaded",
-                "This URL was already downloaded.\n\nDownload again?",
-            ) != QMessageBox.Yes:
+            if not self._ask(
+                "Previously downloaded",
+                "This URL was already downloaded.",
+                "Download again",
+            ):
                 self.url_input.clear()
                 return
 
