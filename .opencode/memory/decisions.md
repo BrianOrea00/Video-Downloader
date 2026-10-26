@@ -42,3 +42,7 @@
 - **Empty sections hide their heading**; `QueuePage._empty_state()` is the only empty block (icon + one line + "Add a link").
 
 - **Source of truth for icon art is Tabler Icons outline** (`https://tabler.io/icons`, SVG from `tabler/tabler-icons`). `assets/*.png` are those SVGs rendered 240x240, solid black on transparent; `ui/icons.py` does the tinting. Add a new icon by rendering its outline SVG the same way, never by shipping a coloured bitmap.
+
+- **Settings has no Save button**: every control autosaves through `SettingsPage._touch()` (400 ms debounce, "Saving…" → "Saved"), then emits `settings_changed` so the queue page re-reads defaults. Theme is the exception: it persists via `MainWindow.set_theme` because the QSS must re-apply live; the status line still confirms.
+- **Dead controls are gone, not stubbed**: the clipboard poller and its interval were removed from Settings until a poller exists; the keys stay in settings.json. `ui_scale` is now a 100/125/150 % selector applied on the next start (`main.py` reads it before the window).
+- **Storage meter is live**: `MainWindow._update_storage()` calls `shutil.disk_usage(download_path)` on page change and after a finished download (via `_refresh_current`); it is never polled. The sidebar bar shows the used fraction, the label the free space, and both carry the folder as a tooltip.

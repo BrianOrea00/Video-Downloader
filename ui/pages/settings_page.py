@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -95,20 +94,19 @@ class SettingsPage(QWidget):
         col.setSpacing(px(16))
 
         col.addWidget(self._download_card())
-        col.addWidget(self._general_card())
         col.addWidget(self._cookies_card())
         col.addWidget(self._appearance_card())
 
-        save_row = QHBoxLayout()
+        # Every control saves itself: there is no form-level commit step.
         self.status = QLabel("")
         self.status.setObjectName("StatusLine")
-        save_row.addWidget(self.status, 1)
-        save = QPushButton("Save")
-        save.setObjectName("PrimaryButton")
-        save.clicked.connect(self.save)
-        save_row.addWidget(save)
-        col.addLayout(save_row)
+        col.addWidget(self.status)
         col.addStretch(1)
+
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(400)   # coalesce spinbox drags
+        self._save_timer.timeout.connect(self._flush)
 
     def _card(self, heading: str) -> tuple[QFrame, QFormLayout]:
         card = QFrame()
@@ -167,25 +165,6 @@ class SettingsPage(QWidget):
         )
         self.audio_only.toggled.connect(lambda v: self._set("default_audio_only", v))
         form.addRow(self._label("Audio only", audio_help), self.audio_only)
-        return card
-
-    def _general_card(self) -> QFrame:
-        card, form = self._card("GENERAL")
-
-        self.auto_clipboard = QCheckBox("Enabled")
-        self.auto_clipboard.setAccessibleName("Poll the clipboard for YouTube URLs")
-        self.auto_clipboard.setChecked(bool(self.settings.get("auto_clipboard", True)))
-        self.auto_clipboard.toggled.connect(lambda v: self._set("auto_clipboard", v))
-        form.addRow(self._label("Auto clipboard detection", "Paste automatically when a link is copied."),
-                    self.auto_clipboard)
-
-        self.interval = QSpinBox()
-        self.interval.setRange(500, 10000)
-        self.interval.setSingleStep(500)
-        self.interval.setSuffix(" ms")
-        self.interval.setValue(int(self.settings.get("clipboard_interval", 3000)))
-        self.interval.valueChanged.connect(lambda v: self._set("clipboard_interval", v))
-        form.addRow(self._label("Clipboard interval", "How often the clipboard is checked."), self.interval)
         return card
 
     def _cookies_card(self) -> QFrame:
@@ -247,6 +226,14 @@ class SettingsPage(QWidget):
         self._select(self.theme_mode, self.settings.get("theme", DEFAULT_MODE))
         self.theme_mode.currentIndexChanged.connect(self._on_theme_changed)
         form.addRow(self._label("Mode", "Dark or light variant of the theme."), self.theme_mode)
+
+        self.scale = QComboBox()
+        for label, value in (("100 %", 1.0), ("125 %", 1.25), ("150 %", 1.5)):
+            self.scale.addItem(label, value)
+        self._select(self.scale, float(self.settings.get("ui_scale", 1.5)))
+        self.scale.currentIndexChanged.connect(
+            lambda: self._set("ui_scale", self.scale.currentData()))
+        form.addRow(self._label("Interface scale", "Applied after a restart."), self.scale)
         return card
 
     # -- helpers -----------------------------------------------------------
@@ -277,6 +264,22 @@ class SettingsPage(QWidget):
 
     def _set(self, key: str, value) -> None:
         self.settings[key] = value
+        self._touch()
+
+    def _touch(self) -> None:
+        """Queue a debounced save; the status line says what is happening."""
+        self.status.setText("Saving\u2026")
+        self._save_timer.start()
+
+    def _flush(self) -> None:
+        save_settings(self.settings)
+        self.settings_changed.emit()
+        self.status.setText("Saved")
+        QTimer.singleShot(1500, self._clear_status)
+
+    def _clear_status(self) -> None:
+        if self.status.text() == "Saved":
+            self.status.setText("")
 
     def _on_mode(self) -> None:
         self._set("download_mode", self.mode.currentData())
@@ -295,6 +298,8 @@ class SettingsPage(QWidget):
         self.settings["theme_family"] = family
         self.settings["theme"] = mode
         self.theme_changed.emit(family, mode)
+        self.status.setText("Saved")
+        QTimer.singleShot(1500, self._clear_status)
 
     def _on_cookie_method(self) -> None:
         self._set("cookie_method", self.cookie_method.currentData())
@@ -311,11 +316,6 @@ class SettingsPage(QWidget):
             self.cookie_file.setText(path)
 
     # -- actions -----------------------------------------------------------
-    def save(self) -> None:
-        save_settings(self.settings)
-        self.status.setText("Saved.")
-        self.settings_changed.emit()
-
     def _test_cookies(self) -> None:
         if self._test_worker is not None and self._test_worker.isRunning():
             return

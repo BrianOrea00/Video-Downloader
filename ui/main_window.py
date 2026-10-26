@@ -2,6 +2,8 @@
 """Application shell: sidebar + top bar + stacked pages."""
 from __future__ import annotations
 
+import shutil
+
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -152,8 +154,27 @@ class MainWindow(QMainWindow):
         self.title_label.setText(TITLES.get(key) or getattr(page, "title", ""))
         self.sidebar.set_active(key)
         self.current_key = key
+        self._update_storage()
+
+    def _update_storage(self) -> None:
+        """Free space for the download folder, refreshed on page change.
+
+        Not polled: the number only moves after a download or a folder change.
+        """
+        path = self.settings.get("download_path") or ""
+        if not path:
+            self.sidebar.set_storage("No folder", 0.0)
+            return
+        try:
+            usage = shutil.disk_usage(path)
+        except OSError:
+            self.sidebar.set_storage("Unavailable", 0.0, path)
+            return
+        free_gb = usage.free / (1024 ** 3)
+        self.sidebar.set_storage(f"{free_gb:.1f} GB free", usage.used / usage.total, path)
 
     def _refresh_current(self) -> None:
+        self._update_storage()
         page = self.pages.get(getattr(self, "current_key", "queue"))
         refresh = getattr(page, "refresh", None)
         if callable(refresh):

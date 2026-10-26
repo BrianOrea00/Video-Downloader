@@ -219,8 +219,19 @@ class Sidebar(QWidget):
         if button is not None and not button.isChecked():
             button.setChecked(True)
 
-    def set_storage(self, used_label: str, fraction: float) -> None:
+    def set_storage(self, used_label: str, fraction: float, path: str = "") -> None:
         """Update the storage readout and bar (``fraction`` in 0.0..1.0)."""
         self.storage_label.setText(used_label)
-        width = int(self._track.width() * max(0.0, min(1.0, fraction)))
-        self._fill.setFixedWidth(max(2, width))
+        self._storage_fraction = max(0.0, min(1.0, fraction))
+        hint = f"Download folder: {path}" if path else ""
+        self._storage_head.setToolTip(hint)
+        self._track.setToolTip(hint)
+        self._paint_storage()
+
+    def _paint_storage(self) -> None:
+        width = int(self._track.width() * getattr(self, "_storage_fraction", 0.0))
+        self._fill.setFixedWidth(max(0, width))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        super().resizeEvent(event)
+        self._paint_storage()
