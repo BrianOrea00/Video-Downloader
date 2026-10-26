@@ -474,11 +474,11 @@ for all text, including the numeric readouts.
 | 6 | Resume + cookie test | Completed |
 | 7 | Hardening | Completed (Python items) — `pyproject.toml` (ruff) + tests added, thread-safe `persistence.py`, `where` fallback, host-match hardening, explicit `except` handling. The Tk-only items (icon caching, theme flash) are moot — see Phase 8. |
 | 8 | PySide6 port (replaces 3/4/5 UI) | Completed — sub-steps 1-8 done; Tk modules deleted, `requirements.txt` is PySide6-only, README rewritten |
-| 9 | Remaining backlog | Planned — clipboard polling, `ui_scale` control, history viewer/cap, queue reorder, dead-code cleanup. See §6. |
-| 10 | Public-release blockers | Planned — data dirs, bundled assets/font, ffmpeg + yt-dlp extras, single instance, icon/version, first-run onboarding. See §7.3–7.4. |
-| 11 | License + repo hygiene | Planned — GPL-3, third-party notices, CI matrix, templates. See §7.2, §7.9. |
-| 12 | Engine update path | Planned — runtime yt-dlp wheel swap; frozen-importer proof first. See §7.6. |
-| 13 | Packaging + signing | Planned — PyInstaller one-dir per OS, AppImage/Inno/dmg, code signing/notarization. See §7.5. |
+| 9 | Remaining backlog | Completed — clipboard polling (§6.1), `ui_scale` control (§6.2), history cap/clear (§6.3), queue reorder (§6.4), dead-code cleanup (§6.5). |
+| 10 | Public-release blockers | Completed — per-user data dirs + migration, bundled assets and Monocraft, requirements with extras, single instance, icon/version/About, live storage meter, excepthook. First run defaults to `~/Downloads`, so adding a link works immediately. See §7.3–7.4. |
+| 11 | License + repo hygiene | Completed except issue/PR templates — GPL-3 + notices, CI lint/test matrix on 3.11-3.13, `SECURITY.md`, log redaction. See §7.2, §7.7, §7.9. |
+| 12 | Engine update path | Completed, frozen-build proof pending — runtime wheel swap with SHA256 verification and fallback; verified against live PyPI in a source run. See §7.6. |
+| 13 | Packaging + signing | In progress — PyInstaller spec, `.desktop`, AppStream metadata and packaging notes are in `packaging/`; the build itself, platform installers and signing are not done. See §7.5. |
 | 14 | First public release | Planned — docs, screenshots, support policy. See §7.10. |
 
 ---
