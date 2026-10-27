@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata for Linux distributions; install to
+     /usr/share/metainfo/video-downloader.metainfo.xml together with
+     packaging/video-downloader.desktop and the app icon. -->
+<component type="desktop-application">
+  <id>video-downloader</id>
+  <name>Video Downloader</name>
+  <summary>Download videos and audio with yt-dlp</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <launchable type="desktop-id">video-downloader.desktop</launchable>
+
+  <description>
+    <p>
+      A desktop front end for yt-dlp with a download queue, parallel or
+      sequential transfers, per-item progress and pause/resume.
+    </p>
+    <p>
+      Finished files appear in a video grid and a music list, and every file
+      stays in the folder you chose. Audio-only downloads need FFmpeg.
+    </p>
+    <p>
+      This program is free software under the GNU General Public License,
+      version 3 or later.
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/BrianOrea00/Video-Downloader</url>
+  <url type="bugtracker">https://github.com/BrianOrea00/Video-Downloader/issues</url>
+
+  <developer id="io.github.brianorea00">
+    <name>Brian Orea</name>
+  </developer>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="1.0.0" date="2026-10-26">
+      <description>
+        <p>First public release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

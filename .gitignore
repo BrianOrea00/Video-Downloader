@@ -21,3 +21,6 @@ logs/
 settings.json
 
 queue.json
+
+# Thumbnails
+.thumbs/

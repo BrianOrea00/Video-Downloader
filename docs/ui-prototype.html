@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-family="arisu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Downloader — UI Prototype (improved, UIIMPROVE.md)</title>
+<!--
+  Reference implementation for UIIMPROVE.md.
+
+  This file is the *target* state: every fix from UIIMPROVE.md that can be shown
+  statically is implemented here and tagged `data-fix="N"`. Click "Fixes" in the
+  top bar to outline the tagged regions and read the marker list.
+
+  Differences from the previous prototype are deliberate. It is not a copy of
+  the Qt code; it is the visual and behavioural reference the Qt code should
+  match. Where the two disagree, this file plus UIIMPROVE.md win.
+-->
+<style>
+  /* ============================================================
+     Tokens — three families x dark/light.
+     arisu light-mode status colours and `muted` are contrast-fixed:
+     every text pair below measures >= 4.5:1 on card / bg / sidebar.
+     Measured values are recorded in UIIMPROVE.md §3.1.
+     ============================================================ */
+
+  /* ---- arisu ---- */
+  [data-family="arisu"][data-theme="dark"] {
+    --bg: #0a0710;            --bg-dark: #05030a;
+    --sidebar: #08050e;       --topbar: #0c0814;
+    --card: #0f0b17;          --popup: #130e1c;
+    --hover: #1f192b;         --border: #2a1f3a;
+    --text: #f8f2ff;          --text-2: #c9c3d4;
+    --muted: #9284a6;         --gray-light: #8a7f9a;
+    --accent: #ff79c6;        --accent-dim: #e35aa5;
+    --info: #bd93f9;          --success: #50fa7b;
+    --error: #ff5555;         --warning: #ffb86c;
+    --paused: #f1fa8c;        --track: #3d3448;
+  }
+  [data-family="arisu"][data-theme="light"] {
+    --bg: #fdfaff;            --bg-dark: #f7f2fb;
+    --sidebar: #f2ecfa;       --topbar: #fdfaff;
+    --card: #ffffff;          --popup: #ffffff;
+    --hover: #ece4f5;         --border: #d9cfe6;
+    --text: #2a1e33;          --text-2: #5c4a6b;
+    --muted: #6b5b7e;         --gray-light: #6b5b7e;
+    --accent: #9c3676;        --accent-dim: #832c62;
+    --info: #6a3fb5;          --success: #1a7f37;
+    --error: #b42323;         --warning: #9a5410;
+    --paused: #7a5c00;        --track: #d9cfe6;
+  }
+
+  /* ---- saas ---- */
+  [data-family="saas"][data-theme="dark"] {
+    --bg: #0b1220;            --bg-dark: #070d18;
+    --sidebar: #0a1020;       --topbar: #0d1526;
+    --card: #111a2e;          --popup: #16203a;
+    --hover: #1b2740;         --border: #263451;
+    --text: #f5f8ff;          --text-2: #c3cde0;
+    --muted: #8593ad;         --gray-light: #9aa7bd;
+    --accent: #3b82f6;        --accent-dim: #2f6fd8;
+    --info: #60a5fa;          --success: #34d399;
+    --error: #f87171;         --warning: #fbbf24;
+    --paused: #facc15;        --track: #223049;
+  }
+  [data-family="saas"][data-theme="light"] {
+    --bg: #f8fafc;            --bg-dark: #f1f5f9;
+    --sidebar: #eef2f7;       --topbar: #ffffff;
+    --card: #ffffff;          --popup: #ffffff;
+    --hover: #e8eef7;         --border: #d3dced;
+    --text: #0f172a;          --text-2: #475569;
+    --muted: #64748b;         --gray-light: #64748b;
+    --accent: #2563eb;        --accent-dim: #1d4ed8;
+    --info: #2563eb;          --success: #15803d;
+    --error: #dc2626;         --warning: #b45309;
+    --paused: #a16207;        --track: #dbe3f0;
+  }
+
+  /* ---- arch ---- */
+  [data-family="arch"][data-theme="dark"] {
+    --bg: #0b0f14;            --bg-dark: #06090c;
+    --sidebar: #0a0e13;       --topbar: #0d1218;
+    --card: #11171f;          --popup: #151c26;
+    --hover: #1b242f;         --border: #26313d;
+    --text: #e8f1f8;          --text-2: #b6c6d4;
+    --muted: #7d90a1;         --gray-light: #8d9fb0;
+    --accent: #1793d1;        --accent-dim: #127cb0;
+    --info: #33b1ff;          --success: #4ade80;
+    --error: #f87171;         --warning: #fbbf24;
+    --paused: #facc15;        --track: #1d2833;
+  }
+  [data-family="arch"][data-theme="light"] {
+    --bg: #f9fbfd;            --bg-dark: #eef4f9;
+    --sidebar: #eaf2f8;       --topbar: #ffffff;
+    --card: #ffffff;          --popup: #ffffff;
+    --hover: #e3eef7;         --border: #cadbe8;
+    --text: #0f1720;          --text-2: #46586a;
+    --muted: #5c6f80;         --gray-light: #5c6f80;
+    --accent: #0e73a8;        --accent-dim: #0b5c88;
+    --info: #0e73a8;          --success: #15803d;
+    --error: #dc2626;         --warning: #b45309;
+    --paused: #a16207;        --track: #d5e3ee;
+  }
+
+  /* ============================================================
+     Fix 2 — two type roles: `ui` sans, `mono` for numbers/brand/paths
+     ============================================================ */
+  :root {
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "Monocraft", ui-monospace, "Cascadia Mono",
+                 "JetBrains Mono", Menlo, Consolas, monospace;
+    --maxw: 980px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  button, input, select { font: inherit; color: inherit; }
+  svg { display: block; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ============================================================
+     Fix 5 — focus is always visible, never removed
+     ============================================================ */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  .row:focus-visible, .vcard:focus-visible { outline-offset: 1px; }
+
+  /* ============================================================
+     Shell
+     ============================================================ */
+  .shell { display: flex; height: 100vh; }
+  .sidebar {
+    width: 240px; flex: 0 0 240px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 16px 12px 12px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 0 4px 12px; }
+  .logo-mark {
+    width: 22px; height: 22px; border-radius: 5px; flex: 0 0 22px;
+    background: var(--accent); color: var(--bg-dark);
+    display: grid; place-items: center;
+  }
+  .logo-mark svg { width: 14px; height: 14px; }
+  .logo-title { font-size: 13px; font-weight: 700; line-height: 1.15; }
+  .logo-sub { font-size: 10px; color: var(--muted); }
+
+  .section-label {
+    font-size: 9px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); padding: 12px 8px 4px;
+  }
+  .nav-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 8px 10px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--text); font-size: 12px;
+    cursor: pointer; text-align: left; margin-bottom: 2px;
+  }
+  .nav-btn .ic { width: 16px; height: 16px; flex: 0 0 16px; color: var(--gray-light); }
+  .nav-btn:hover { background: var(--hover); }
+  .nav-btn.active { background: var(--accent); color: var(--bg-dark); font-weight: 600; }
+  .nav-btn.active .ic { color: var(--bg-dark); }
+
+  .sidebar-spacer { flex: 1; }
+  .storage { padding: 10px 4px 0; border-top: 1px solid var(--border); }
+  .storage-head {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 10px; color: var(--muted); margin-bottom: 6px;
+  }
+  .storage-head .mono { color: var(--gray-light); }
+  .track { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+  .track-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+  .storage-note { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+  /* ---- main ---- */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+  .topbar {
+    min-height: 56px; flex: 0 0 auto;
+    background: var(--topbar);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 20px;
+  }
+  .topbar h1 { font-size: 15px; font-weight: 700; flex: 1; }
+  .badge {
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 8px; font-size: 11px; color: var(--accent);
+  }
+  /* Fix 15 — no badge when there is nothing to count */
+  .badge[hidden] { display: none; }
+
+  /* ---- buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text);
+    font-size: 12px; padding: 7px 14px; cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn svg { width: 15px; height: 15px; }
+  .btn:hover:not(:disabled) { background: var(--hover); }
+  .btn.primary { background: var(--accent); color: var(--bg-dark); border-color: transparent; font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-dim); }
+  .btn.danger { color: var(--error); border-color: var(--error); background: transparent; }
+  .btn.danger:hover:not(:disabled) { background: var(--card); }
+  .btn.sm { padding: 5px 10px; font-size: 11px; }
+  .btn.icon-only { padding: 7px; }
+
+  /* Fix 4 — disabled states win over ID styling */
+  .btn:disabled {
+    background: var(--bg) !important;
+    color: var(--muted) !important;
+    border-color: var(--border) !important;
+    cursor: not-allowed;
+    opacity: .85;
+  }
+
+  .content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; }
+  /* keep content clear of the markers panel while it is open */
+  body.fixes-on .content { padding-right: 360px; }
+  body.fixes-on .topbar { padding-right: 360px; }
+  @media (max-width: 1200px) {
+    body.fixes-on .content,
+    body.fixes-on .topbar { padding-right: 20px; }
+  }
+  .page { display: none; max-width: var(--maxw); margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* ---- cards ---- */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin-bottom: 16px;
+  }
+  .field-label {
+    font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px;
+  }
+
+  /* Fix 6 — the input row wraps instead of clipping */
+  .input-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .input {
+    flex: 1 1 320px; min-width: 220px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text);
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 9px 12px; outline: none;
+  }
+  .input::placeholder { color: var(--muted); }
+  .input:focus { border-color: var(--accent); }
+  .input-row .btn { flex: 0 0 auto; }
+
+  /* Fix 8 — validation is text + icon, not colour alone */
+  .field-msg {
+    display: none; align-items: center; gap: 6px;
+    margin-top: 8px; font-size: 11px;
+  }
+  .field-msg svg { width: 13px; height: 13px; flex: 0 0 13px; }
+  .field-msg.show { display: flex; }
+  .field-msg.ok { color: var(--success); }
+  .field-msg.bad { color: var(--error); }
+
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+  .pill {
+    border: 1px solid var(--border); border-radius: 14px;
+    background: var(--bg); color: var(--gray-light);
+    font-size: 12px; padding: 5px 14px; cursor: pointer;
+  }
+  .pill:hover { background: var(--hover); }
+  .pill[aria-pressed="true"] {
+    border-color: var(--accent); color: var(--accent); background: var(--hover);
+    font-weight: 600;
+  }
+  .pill:disabled { color: var(--muted); cursor: not-allowed; border-color: var(--border); }
+
+  .path-row { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .path {
+    flex: 1; min-width: 0;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--gray-light); font-family: var(--font-mono); font-size: 11px;
+    padding: 9px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .path .k { color: var(--muted); }
+
+  /* ============================================================
+     Fix 9 — preview is an inset surface, not a card inside a card
+     ============================================================ */
+  .preview {
+    margin-top: 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); padding: 10px;
+    display: flex; gap: 12px; align-items: center;
+  }
+  .preview[hidden] { display: none; }
+  .preview-thumb {
+    width: 112px; height: 63px; flex: 0 0 112px; border-radius: 6px;
+    border: 1px solid var(--border); position: relative; overflow: hidden;
+    background: radial-gradient(120% 120% at 50% 0%, var(--hover) 0%, var(--bg) 60%);
+    display: grid; place-items: center; color: var(--muted);
+  }
+  .preview-thumb svg { width: 20px; height: 20px; }
+  .preview-thumb .dur, .vthumb .dur {
+    position: absolute; right: 4px; bottom: 4px;
+    background: var(--bg-dark); color: var(--text);
+    font-family: var(--font-mono); font-size: 9px;
+    padding: 1px 4px; border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .preview-body { flex: 1; min-width: 0; }
+  .preview-title {
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .preview-meta { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; align-items: center; }
+  .preview-state { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+  .spinner {
+    width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- chips ---- */
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip {
+    background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+    font-size: 11px; color: var(--gray-light); padding: 4px 10px;
+  }
+  .chip b { color: var(--text); font-weight: 600; font-family: var(--font-mono); }
+
+  /* ---- sections / rows ---- */
+  .group[hidden] { display: none; }
+  .section-title {
+    font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); margin: 18px 0 8px;
+  }
+  .row {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .row.active-row { border-color: var(--accent); }
+  .row.failed { border-color: var(--error); }
+
+  .tile {
+    width: 40px; height: 28px; flex: 0 0 40px; border-radius: 4px;
+    background: var(--bg); border: 1px solid var(--border);
+    display: grid; place-items: center; color: var(--gray-light);
+  }
+  .tile svg { width: 14px; height: 14px; }
+
+  .row-main { flex: 1; min-width: 0; }
+  /* Fix 11 — elide, never hard-slice */
+  .row-title {
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row-title.dim { color: var(--muted); font-weight: 400; }
+  .row-meta { display: flex; gap: 6px; margin-top: 4px; align-items: center; flex-wrap: wrap; }
+  .mini-chip {
+    border: 1px solid var(--border); border-radius: 4px; background: var(--bg);
+    font-size: 10px; color: var(--accent); padding: 1px 6px;
+    font-family: var(--font-mono);
+  }
+  .mini-chip.sub { color: var(--gray-light); font-family: var(--font-ui); }
+  .mini-chip.info { color: var(--info); }
+  .status { font-size: 11px; display: inline-flex; align-items: center; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  .st-pending { color: var(--muted); }      .dot-pending { background: var(--muted); }
+  .st-download { color: var(--accent); }    .dot-download { background: var(--accent); }
+  .st-done { color: var(--success); }       .dot-done { background: var(--success); }
+  .st-failed { color: var(--error); }       .dot-failed { background: var(--error); }
+  .st-paused { color: var(--warning); }     .dot-paused { background: var(--warning); }
+
+  .row-progress {
+    height: 4px; border-radius: 2px; background: var(--track);
+    overflow: hidden; margin-top: 7px;
+  }
+  .row-progress > span {
+    display: block; height: 100%; background: var(--accent); border-radius: 2px;
+    /* Fix 19 — motion only where it carries state */
+    transition: width .15s linear;
+  }
+  .row-stats {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    font-size: 11px; color: var(--gray-light); margin-top: 5px;
+    font-family: var(--font-mono);
+  }
+  .row-stats .speed { color: var(--info); }
+
+  /* Fix 12 — failure explains itself */
+  .row-error {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 6px; font-size: 11px; color: var(--error);
+  }
+  .row-error svg { width: 13px; height: 13px; flex: 0 0 13px; }
+  .row-error span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .row-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+  .icon-btn {
+    width: 30px; height: 30px; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--gray-light); cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .icon-btn svg { width: 15px; height: 15px; }
+  .icon-btn:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+  .icon-btn.play { background: var(--accent); border-color: transparent; color: var(--bg-dark); }
+  .icon-btn.play:hover:not(:disabled) { background: var(--accent-dim); color: var(--bg-dark); }
+  .icon-btn.danger { border-color: var(--error); color: var(--error); }
+  .icon-btn.danger:hover:not(:disabled) { background: var(--card); }
+  .icon-btn:disabled { color: var(--muted); border-color: var(--border); cursor: not-allowed; }
+
+  /* Fix 10 — one real empty state */
+  .empty {
+    border: 1px dashed var(--border); border-radius: 10px;
+    background: var(--card); padding: 32px 20px; text-align: center;
+    color: var(--muted);
+  }
+  .empty svg { width: 28px; height: 28px; margin: 0 auto 10px; color: var(--muted); }
+  .empty h2 { font-size: 13px; color: var(--text); margin-bottom: 4px; }
+  .empty p { font-size: 12px; margin-bottom: 14px; }
+
+  .action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .hints {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    color: var(--muted); font-size: 11px; margin-left: auto;
+  }
+  kbd {
+    font-family: var(--font-mono); font-size: 10px;
+    border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 5px; color: var(--gray-light);
+    background: var(--bg);
+  }
+
+  /* ============================================================
+     Fix 18 — libraries: sort, hover actions, count
+     ============================================================ */
+  .lib-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lib-head .input { flex: 1 1 240px; }
+  .select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; font-size: 12px; color: var(--text); cursor: pointer;
+  }
+  .lib-count { font-size: 11px; color: var(--muted); margin: 0 0 12px 2px; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+    gap: 12px;
+  }
+  .vcard {
+    border-radius: 8px; border: 1px solid var(--border); background: var(--card);
+    overflow: hidden; position: relative; cursor: pointer;
+  }
+  .vcard:hover { border-color: var(--muted); }
+  .vthumb {
+    aspect-ratio: 16/9;
+    background: radial-gradient(120% 120% at 50% 0%, var(--hover) 0%, var(--bg) 60%);
+    display: grid; place-items: center; color: var(--muted); position: relative;
+  }
+  .vthumb > svg { width: 22px; height: 22px; }
+  .vbody { padding: 8px 10px 10px; }
+  .vtitle {
+    font-size: 12px; font-weight: 600; line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .vmeta {
+    font-size: 10px; color: var(--muted); margin-top: 5px;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .vmeta .mono { color: var(--info); }
+  .vacts {
+    position: absolute; top: 6px; right: 6px; display: flex; gap: 4px;
+    opacity: 0; transition: opacity .12s ease;
+  }
+  .vcard:hover .vacts, .vcard:focus-within .vacts { opacity: 1; }
+  .vacts .icon-btn { background: var(--bg-dark); border-color: var(--border); }
+  .vacts .icon-btn.play { background: var(--accent); }
+
+  @media (hover: none) { .vacts { opacity: 1; } }
+
+  /* ============================================================
+     Fix 16/17 — settings: autosave, switches, no Save button
+     ============================================================ */
+  .set-row {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .set-row:last-child { border-bottom: 0; }
+  .set-name { font-size: 13px; }
+  .set-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .set-control { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+
+  .switch {
+    position: relative; width: 38px; height: 22px; border-radius: 11px;
+    background: var(--track); border: 1px solid var(--border);
+    cursor: pointer; padding: 0;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--text);
+    transition: left .12s ease, background .12s ease;
+  }
+  .switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+  .switch[aria-checked="true"]::after { left: 18px; background: var(--bg-dark); }
+
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button {
+    border: 0; background: transparent; color: var(--gray-light);
+    padding: 7px 13px; font-size: 12px; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] {
+    background: var(--accent); color: var(--bg-dark); font-weight: 600;
+  }
+  .save-state {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--success);
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .save-state.show { opacity: 1; }
+  .save-state svg { width: 12px; height: 12px; }
+
+  /* ---- Fix 20 — inline feedback instead of modals ---- */
+  .toast {
+    position: fixed; left: 20px; bottom: 20px; z-index: 60;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--popup); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px; padding: 10px 14px; font-size: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    max-width: 380px;
+    transform: translateY(8px); opacity: 0; pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .toast svg { width: 14px; height: 14px; flex: 0 0 14px; color: var(--accent); }
+  .toast .close { margin-left: 6px; background: transparent; border: 0; color: var(--muted); cursor: pointer; }
+
+  /* ============================================================
+     Fixes overlay
+     ============================================================ */
+  .fixes {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 340px; z-index: 70;
+    background: var(--popup); border-left: 1px solid var(--border);
+    padding: 18px; overflow-y: auto;
+    transform: translateX(100%); transition: transform .18s ease;
+  }
+  .fixes.open { transform: translateX(0); }
+  .fixes h2 { font-size: 13px; margin-bottom: 4px; }
+  .fixes p { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+  .fixes ol { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .fixes li { display: flex; gap: 8px; font-size: 11px; color: var(--text-2); }
+  .fixes li b {
+    flex: 0 0 22px; height: 18px; border-radius: 3px;
+    background: var(--info); color: var(--bg-dark);
+    font-family: var(--font-mono); font-size: 10px;
+    display: grid; place-items: center;
+  }
+  .fixes .close-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+
+  body.fixes-on [data-fix] {
+    outline: 2px dashed var(--info); outline-offset: 2px; position: relative;
+  }
+  body.fixes-on [data-fix]::after {
+    content: attr(data-fix);
+    position: absolute; top: -10px; left: -10px; z-index: 50;
+    background: var(--info); color: var(--bg-dark);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    padding: 1px 5px; border-radius: 3px;
+  }
+
+  /* ============================================================
+     Fix 19 — one motion policy, opt-out respected
+     ============================================================ */
+  .row { animation: row-in .12s ease-out; }
+  @keyframes row-in { from { opacity: 0; } to { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
+
+  /* Narrow windows: keep everything reachable, never clip */
+  @media (max-width: 900px) {
+    .sidebar { width: 68px; flex-basis: 68px; padding: 12px 8px; }
+    .logo-text, .section-label, .storage-head, .storage-note, .nav-btn span.label { display: none; }
+    .nav-btn { justify-content: center; padding: 10px 0; gap: 0; }
+    .storage { border-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ icon sprite (Fix 1) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5.5v13l11-6.5z"/>
+    </symbol>
+    <symbol id="i-music" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/>
+      <path d="M4 17h4"/><path d="M12 17h8"/><circle cx="10" cy="17" r="2"/>
+    </symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <path d="M6 6l12 12"/><path d="M18 6L6 18"/>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/>
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/>
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3l9 16H3z"/><path d="M12 9v4"/><path d="M12 16h.01"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12.5l5 5L20 6"/>
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+    </symbol>
+    <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <path d="M12 5v14"/><path d="M5 12h14"/>
+    </symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+      <rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>
+    </symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M4 7h16M4 12h16M4 17h16"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="shell">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="logo">
+      <div class="logo-mark" data-fix="1"><svg><use href="#i-download"/></svg></div>
+      <div class="logo-text">
+        <div class="logo-title">Downloader</div>
+        <!-- Fix 2: mono is for the version/brand line, not body copy -->
+        <div class="logo-sub mono">yt-dlp</div>
+      </div>
+    </div>
+
+    <div class="section-label">Library</div>
+    <button class="nav-btn active" data-page="queue" aria-current="page">
+      <svg class="ic"><use href="#i-download"/></svg><span class="label">Queue</span>
+    </button>
+    <button class="nav-btn" data-page="videos">
+      <svg class="ic"><use href="#i-play"/></svg><span class="label">Videos</span>
+    </button>
+    <button class="nav-btn" data-page="music">
+      <svg class="ic"><use href="#i-music"/></svg><span class="label">Music</span>
+    </button>
+
+    <div class="section-label">System</div>
+    <button class="nav-btn" data-page="settings">
+      <svg class="ic"><use href="#i-settings"/></svg><span class="label">Settings</span>
+    </button>
+
+    <div class="sidebar-spacer"></div>
+
+    <!-- Fix 17: the storage meter now reports real usage for the download folder -->
+    <div class="storage" data-fix="17" title="Download folder: /home/arisu/Downloads">
+      <div class="storage-head">
+        <span>Storage</span>
+        <span class="mono" id="storage-value">14.2 GB free</span>
+      </div>
+      <div class="track" role="img" aria-label="Download folder 34 percent full">
+        <div class="track-fill" style="width:34%"></div>
+      </div>
+      <div class="storage-note">Downloads · 34% used</div>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <header class="topbar" data-fix="3">
+      <h1 id="page-title">Download Queue</h1>
+      <!-- Fix 15: hidden at zero, see renderBadge() -->
+      <div class="badge mono" id="count-badge" hidden data-fix="15">0 items</div>
+      <button class="btn sm" id="fixes-toggle" aria-expanded="false" aria-controls="fixes-panel">
+        <svg><use href="#i-alert"/></svg> Fixes
+      </button>
+      <button class="btn sm" id="theme-toggle">
+        <svg><use href="#i-sun"/></svg><span>Light</span>
+      </button>
+    </header>
+
+    <div class="content">
+
+      <!-- ============ QUEUE ============ -->
+      <section class="page active" id="page-queue">
+
+        <div class="card">
+          <div class="field-label">Add URL</div>
+          <div class="input-row" data-fix="6">
+            <input class="input" id="url-input" placeholder="https://youtube.com/watch?v=..."
+                   spellcheck="false" autocomplete="off"
+                   aria-label="Video URL" aria-describedby="url-msg" data-fix="7">
+            <button class="btn" id="paste-btn">Paste</button>
+            <button class="btn primary" id="add-btn">
+              <svg><use href="#i-plus"/></svg> Add to Queue
+            </button>
+          </div>
+
+          <!-- Fix 8: the message is the signal; the border is redundancy -->
+          <div class="field-msg" id="url-msg" role="status" aria-live="polite" data-fix="8"></div>
+
+          <div class="pill-row">
+            <button class="pill" data-res="144" aria-pressed="false">144p</button>
+            <button class="pill" data-res="240" aria-pressed="false">240p</button>
+            <button class="pill" data-res="360" aria-pressed="false">360p</button>
+            <button class="pill" data-res="480" aria-pressed="false">480p</button>
+            <button class="pill" data-res="720" aria-pressed="false">720p</button>
+            <button class="pill" data-res="1080" aria-pressed="true">1080p</button>
+            <span style="flex:1"></span>
+            <button class="pill" id="audio-pill" aria-pressed="false">Audio Only</button>
+          </div>
+
+          <div class="path-row">
+            <div class="path" id="path-label" title="/home/arisu/Downloads">
+              <span class="k">~/</span>Downloads
+            </div>
+            <button class="btn">Browse…</button>
+          </div>
+
+          <!-- Fix 9 -->
+          <div class="preview" id="preview" hidden data-fix="9"></div>
+        </div>
+
+        <div class="chip-row">
+          <div class="chip">Total <b id="stat-total">0</b></div>
+          <div class="chip">Pending <b id="stat-pending">0</b></div>
+          <div class="chip">Active <b id="stat-active">0</b></div>
+          <div class="chip">Done <b id="stat-done">0</b></div>
+        </div>
+
+        <!-- Fix 10: these groups hide themselves when empty -->
+        <section class="group" id="active-group" hidden>
+          <div class="section-title">Active</div>
+          <div id="active-list"></div>
+        </section>
+
+        <section class="group" id="queue-group" hidden>
+          <div class="section-title">Queue</div>
+          <div id="queue-list"></div>
+        </section>
+
+        <div id="queue-empty" data-fix="10"></div>
+
+        <div class="action-row">
+          <!-- Fix 4: Stop renders disabled, not merely unclickable -->
+          <button class="btn primary" id="start-btn" data-fix="5">
+            <svg><use href="#i-play"/></svg> Start Queue
+          </button>
+          <button class="btn danger" id="stop-btn" disabled data-fix="4">Stop</button>
+          <button class="btn" id="clear-btn">Clear Completed</button>
+          <!-- Fix 7: shortcuts are discoverable, not folklore -->
+          <div class="hints" data-fix="7">
+            <span><kbd>Enter</kbd> add</span>
+            <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> start</span>
+            <span><kbd>/</kbd> search</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIDEOS ============ -->
+      <section class="page" id="page-videos">
+        <div class="card">
+          <div class="lib-head" data-fix="18">
+            <input class="input" id="video-search" placeholder="Search videos… ( / )"
+                   spellcheck="false" aria-label="Search videos">
+            <select class="select" id="video-sort" aria-label="Sort videos">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="largest">Largest first</option>
+              <option value="name">Name A–Z</option>
+            </select>
+            <button class="btn icon-only" id="video-refresh" title="Refresh" aria-label="Refresh videos">
+              <svg><use href="#i-refresh"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="lib-count" id="video-count"></div>
+        <div class="grid" id="video-grid"></div>
+        <div id="video-empty"></div>
+      </section>
+
+      <!-- ============ MUSIC ============ -->
+      <section class="page" id="page-music">
+        <div class="card">
+          <div class="lib-head">
+            <input class="input" id="music-search" placeholder="Search music… ( / )"
+                   spellcheck="false" aria-label="Search music">
+            <select class="select" id="music-sort" aria-label="Sort music">
+              <option value="title">Title A–Z</option>
+              <option value="artist">Artist A–Z</option>
+              <option value="newest">Newest first</option>
+            </select>
+            <button class="btn icon-only" id="music-refresh" title="Refresh" aria-label="Refresh music">
+              <svg><use href="#i-refresh"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="lib-count" id="music-count"></div>
+        <div id="music-list"></div>
+        <div id="music-empty"></div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="page" id="page-settings">
+        <div class="card">
+          <div class="field-label">Download</div>
+
+          <div class="set-row">
+            <div>
+              <div class="set-name">Download mode</div>
+              <div class="set-desc">Parallel downloads several files at once.</div>
+            </div>
+            <div class="set-control">
+              <div class="seg" data-setting="mode">
+                <button data-value="parallel" aria-pressed="true">Parallel</button>
+                <button data-value="sequential" aria-pressed="false">Sequential</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="set-row">
+            <div>
+              <div class="set-name">Max parallel downloads</div>
+              <div class="set-desc">Used in parallel mode.</div>
+            </div>
+            <div class="set-control">
+              <div class="seg" data-setting="limit">
+                <button data-value="1" aria-pressed="false">1</button>
+                <button data-value="2" aria-pressed="true">2</button>
+                <button data-value="3" aria-pressed="false">3</button>
+                <button data-value="4" aria-pressed="false">4</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-label" style="margin-top:16px">Defaults</div>
+
+          <div class="set-row">
+            <div>
+              <div class="set-name">Default resolution</div>
+              <div class="set-desc">Applied to new queue items.</div>
+            </div>
+            <div class="set-control">
+              <div class="seg" data-setting="res">
+                <button data-value="480" aria-pressed="false">480p</button>
+                <button data-value="720" aria-pressed="false">720p</button>
+                <button data-value="1080" aria-pressed="true">1080p</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="set-row">
+            <div>
+              <div class="set-name">Audio only</div>
+              <div class="set-desc">Download MP3 by default.</div>
+            </div>
+            <div class="set-control">
+              <button class="switch" role="switch" aria-checked="false"
+                      aria-label="Audio only by default" data-setting="audio"></button>
+            </div>
+          </div>
+
+          <div class="field-label" style="margin-top:16px">General</div>
+
+          <div class="set-row" data-fix="17">
+            <div>
+              <div class="set-name">Auto clipboard detection</div>
+              <div class="set-desc">Polls the clipboard every 1.5 s while the Queue tab is open.</div>
+            </div>
+            <div class="set-control">
+              <button class="switch" role="switch" aria-checked="true"
+                      aria-label="Poll the clipboard for links" data-setting="clipboard"></button>
+            </div>
+          </div>
+
+          <div class="set-row">
+            <div>
+              <div class="set-name">Interface scale</div>
+              <div class="set-desc">Applies on restart. Matches the pixel density you are comfortable with.</div>
+            </div>
+            <div class="set-control">
+              <div class="seg" data-setting="scale">
+                <button data-value="1" aria-pressed="false">100%</button>
+                <button data-value="1.25" aria-pressed="false">125%</button>
+                <button data-value="1.5" aria-pressed="true">150%</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="set-row">
+            <div>
+              <div class="set-name">Cookies</div>
+              <div class="set-desc">Browser or cookies.txt for restricted content.</div>
+            </div>
+            <div class="set-control">
+              <button class="btn">Configure…</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="field-label">Appearance</div>
+          <div class="set-row">
+            <div>
+              <div class="set-name">Theme</div>
+              <div class="set-desc">Colour family for the whole app.</div>
+            </div>
+            <div class="set-control">
+              <select class="select" id="family-select" aria-label="Theme family">
+                <option value="arisu">Arisu Pink</option>
+                <option value="saas">SaaS Blue</option>
+                <option value="arch">Arch Blue</option>
+              </select>
+            </div>
+          </div>
+          <div class="set-row">
+            <div>
+              <div class="set-name">Mode</div>
+              <div class="set-desc">Dark or light variant.</div>
+            </div>
+            <div class="set-control">
+              <div class="seg" id="mode-seg">
+                <button data-value="dark" aria-pressed="true">Dark</button>
+                <button data-value="light" aria-pressed="false">Light</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="field-label">About</div>
+          <div class="set-row">
+            <div>
+              <div class="set-name">Video Downloader <span class="mono" style="color:var(--muted)">1.0.0</span></div>
+              <div class="set-desc">yt-dlp engine · GPL-3.0-or-later · data in ~/.local/share/video-downloader</div>
+            </div>
+            <div class="set-control">
+              <!-- Fix 20: destructive actions may still confirm -->
+              <button class="btn danger" id="reset-btn">Reset to defaults</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fix 16: no Save button; changes persist and report themselves -->
+        <div class="action-row" data-fix="16">
+          <div class="save-state" id="save-state">
+            <svg><use href="#i-check"/></svg> Saved
+          </div>
+          <div class="hints">Changes apply immediately.</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ inline feedback (Fix 20) ============ -->
+<div class="toast" id="toast" role="status" aria-live="polite" data-fix="20">
+  <svg><use href="#i-check"/></svg>
+  <span id="toast-text"></span>
+  <button class="close" aria-label="Dismiss" id="toast-close">✕</button>
+</div>
+
+<!-- ============ fixes overlay ============ -->
+<aside class="fixes" id="fixes-panel" aria-label="Applied UI fixes" aria-hidden="true">
+  <div class="close-row">
+    <button class="btn sm" id="fixes-close">Close</button>
+  </div>
+  <h2>Applied fixes</h2>
+  <p>Numbers match UIIMPROVE.md and the <code>data-fix</code> tags in this file.
+     Outlines mark a representative region, not the full extent of each change.</p>
+  <ol>
+    <li><b>1</b> One SVG icon set, no emoji affordances.</li>
+    <li><b>2</b> UI sans for text, mono for numbers and paths.</li>
+    <li><b>3</b> Contrast-fixed tokens; light-mode status colours.</li>
+    <li><b>4</b> Disabled buttons look disabled.</li>
+    <li><b>5</b> Visible focus ring on every control.</li>
+    <li><b>6</b> Input row wraps; nothing clips at narrow widths.</li>
+    <li><b>7</b> Enter adds, Ctrl+Enter starts, / searches.</li>
+    <li><b>8</b> Validation is icon + text, not colour alone.</li>
+    <li><b>9</b> Preview: inset surface, duration badge, live size.</li>
+    <li><b>10</b> Empty states; empty sections hidden.</li>
+    <li><b>11</b> Titles elide with a tooltip.</li>
+    <li><b>12</b> Failed rows show the reason and a Retry.</li>
+    <li><b>13</b> Completed rows offer Play and Reveal.</li>
+    <li><b>14</b> Queue says Remove; trash is for files.</li>
+    <li><b>15</b> Badge hidden when the count is zero.</li>
+    <li><b>16</b> Settings autosave; one persistence model.</li>
+    <li><b>17</b> Storage and clipboard controls are real.</li>
+    <li><b>18</b> Libraries: sort, hover actions, counts.</li>
+    <li><b>19</b> Short, state-carrying motion; reduced-motion honored.</li>
+    <li><b>20</b> Routine feedback is inline, not modal.</li>
+  </ol>
+  <p style="margin-top:14px">Fixes 21–24 (window geometry, row reconciliation,
+     bundled fonts, version + single instance) are code-only and have no marker here.</p>
+</aside>
+
+<script>
+"use strict";
+
+/* ============================================================
+   State
+   ============================================================ */
+const state = {
+  page: "queue",
+  res: "1080",
+  audio: false,
+  family: "arisu",
+  mode: "dark",
+  fixes: false,
+  queue: [
+    { id: 1, title: "How GPS Actually Works (watch this first)",
+      res: "720p", status: "downloading", pct: 43, error: "",
+      channel: "Veritasium", duration: "23:41", views: "4.2M views" },
+    { id: 2, title: "Building a Linux Router — Full Guide",
+      res: "1080p", status: "pending", pct: 0, error: "",
+      channel: "NetworkChuck", duration: "18:12", views: "980K views" },
+    { id: 3, title: "Pixel Art Animation Fundamentals",
+      res: "MP3", status: "pending", pct: 0, error: "" },
+    { id: 4, title: "Rust in 100 Seconds",
+      res: "480p", status: "completed", pct: 100, error: "",
+      channel: "Fireship", duration: "2:14", views: "3.1M views" },
+    { id: 5, title: "Why your Wi-Fi drops every evening, explained and fixed",
+      res: "1080p", status: "failed", pct: 0,
+      error: "HTTP Error 403: Forbidden — try browser cookies in Settings",
+      channel: "Tech Altar", duration: "12:40", views: "610K views" }
+  ],
+  videos: [
+    { name: "css-101.webm", size: 1.2e6, sizeLabel: "1.2 MB", date: "Sep 21", iso: 21, duration: "8:31" },
+    { name: "deploy-final-mix.mp4", size: 4.12e8, sizeLabel: "412 MB", date: "Sep 19", iso: 19, duration: "1:04:12" },
+    { name: "guitar-loop-final.mov", size: 8.8e7, sizeLabel: "88 MB", date: "Sep 15", iso: 15, duration: "3:12" },
+    { name: "conference-keynote.mp4", size: 1.9e9, sizeLabel: "1.9 GB", date: "Sep 11", iso: 11, duration: "52:08" },
+    { name: "trailer-v2.mkv", size: 6.2e8, sizeLabel: "620 MB", date: "Sep 09", iso: 9, duration: "2:24" },
+    { name: "night-ride.mp4", size: 3.1e8, sizeLabel: "310 MB", date: "Sep 04", iso: 4, duration: "14:05" }
+  ],
+  music: [
+    { title: "Lavender Haze", artist: "Midnight", duration: "3:22", size: "9.8 MB", date: 20 },
+    { title: "Neon Skyline", artist: "Unknown Artist", duration: "4:05", size: "11.2 MB", date: 18 },
+    { title: "Last Train", artist: "Night Drive", duration: "3:47", size: "10.4 MB", date: 16 },
+    { title: "Glass Waves", artist: "Flume-copy", duration: "5:12", size: "14.6 MB", date: 12 }
+  ],
+  preview: null,
+  videoSort: "newest",
+  musicSort: "title",
+  videoFilter: "",
+  musicFilter: ""
+};
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, html) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (html !== undefined) node.innerHTML = html;
+  return node;
+};
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ============================================================
+   Fix 20 — single inline feedback surface
+   ============================================================ */
+let toastTimer = null;
+function toast(message, ok = true) {
+  $("toast-text").textContent = message;
+  $("toast").querySelector("svg").innerHTML =
+    '<use href="' + (ok ? "#i-check" : "#i-alert") + '"/>';
+  $("toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 3200);
+}
+$("toast-close").addEventListener("click", () => $("toast").classList.remove("show"));
+
+/* ============================================================
+   Fix 3/2 — theme application
+   ============================================================ */
+function applyTheme() {
+  document.documentElement.dataset.family = state.family;
+  document.documentElement.dataset.theme = state.mode;
+  const btn = $("theme-toggle");
+  const dark = state.mode === "dark";
+  btn.querySelector("svg").innerHTML = '<use href="' + (dark ? "#i-sun" : "#i-moon") + '"/>';
+  btn.querySelector("span").textContent = dark ? "Light" : "Dark";
+  btn.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+  $("mode-seg").querySelectorAll("button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.value === state.mode)));
+  $("family-select").value = state.family;
+}
+
+function persist() {
+  // Fix 16 — every change saves; the badge reports it and fades.
+  const badge = $("save-state");
+  badge.classList.add("show");
+  clearTimeout(persist._t);
+  persist._t = setTimeout(() => badge.classList.remove("show"), 1400);
+}
+
+$("theme-toggle").addEventListener("click", () => {
+  state.mode = state.mode === "dark" ? "light" : "dark";
+  applyTheme();
+  persist();
+});
+
+$("mode-seg").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  state.mode = b.dataset.value;
+  applyTheme();
+  persist();
+});
+
+$("family-select").addEventListener("change", (e) => {
+  state.family = e.target.value;
+  applyTheme();
+  persist();
+});
+
+/* ============================================================
+   Navigation
+   ============================================================ */
+const TITLES = { queue: "Download Queue", videos: "Video Library", music: "Music Library", settings: "Settings" };
+document.querySelectorAll(".nav-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-btn").forEach((b) => {
+      b.classList.remove("active");
+      b.removeAttribute("aria-current");
+    });
+    btn.classList.add("active");
+    btn.setAttribute("aria-current", "page");
+    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+    $("page-" + btn.dataset.page).classList.add("active");
+    $("page-title").textContent = TITLES[btn.dataset.page];
+    state.page = btn.dataset.page;
+  });
+});
+
+/* ============================================================
+   Pills
+   ============================================================ */
+document.querySelectorAll(".pill[data-res]").forEach((pill) => {
+  pill.addEventListener("click", () => {
+    if (state.audio) return;
+    state.res = pill.dataset.res;
+    document.querySelectorAll(".pill[data-res]").forEach((p) =>
+      p.setAttribute("aria-pressed", String(p === pill)));
+    renderPreview();
+  });
+});
+
+$("audio-pill").addEventListener("click", () => {
+  state.audio = !state.audio;
+  $("audio-pill").setAttribute("aria-pressed", String(state.audio));
+  document.querySelectorAll(".pill[data-res]").forEach((p) => { p.disabled = state.audio; });
+  renderPreview();
+});
+
+/* ============================================================
+   Fix 8 — inline validation
+   ============================================================ */
+const URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com|soundcloud\.com|\.+)\//i;
+let previewTimer = null;
+let previewToken = 0;
+
+function setMessage(kind, text) {
+  const box = $("url-msg");
+  box.className = "field-msg show " + kind;
+  const icon = kind === "ok" ? "#i-check" : "#i-alert";
+  box.innerHTML = '<svg><use href="' + icon + '"/></svg><span>' + esc(text) + "</span>";
+  $("url-input").setAttribute("aria-invalid", kind === "bad" ? "true" : "false");
+}
+function clearMessage() {
+  $("url-msg").className = "field-msg";
+  $("url-msg").innerHTML = "";
+  $("url-input").removeAttribute("aria-invalid");
+}
+
+$("url-input").addEventListener("input", () => {
+  const text = $("url-input").value.trim();
+  clearTimeout(previewTimer);
+  if (!text) {
+    clearMessage();
+    hidePreview();
+    return;
+  }
+  if (!URL_RE.test(text)) {
+    setMessage("bad", "Not a supported link — paste a YouTube or yt-dlp-supported URL.");
+    hidePreview();
+    return;
+  }
+  setMessage("ok", "Recognised link.");
+  fetchPreview();
+});
+
+/* ============================================================
+   Fix 9 — preview: spinner, duration badge, live size estimate
+   ============================================================ */
+const PREVIEW_DATA = {
+  title: "How GPS Actually Works (watch this first)",
+  channel: "Veritasium",
+  duration: "23:41",
+  views: "4.2M views"
+};
+const BITRATE_MBPS = { 144: 0.12, 240: 0.25, 360: 0.5, 480: 0.9, 720: 1.4, 1080: 2.4 };
+
+function estimate() {
+  const seconds = 1421;                       // 23:41
+  if (state.audio) return { label: "MP3", size: "~23 MB" };
+  const mb = (seconds * BITRATE_MBPS[state.res]) / 8;
+  const size = mb >= 1024 ? "~" + (mb / 1024).toFixed(1) + " GB" : "~" + Math.round(mb) + " MB";
+  return { label: state.res + "p MP4", size: size };
+}
+
+function fetchPreview() {
+  const token = ++previewToken;
+  const box = $("preview");
+  box.hidden = false;
+  box.innerHTML = '<div class="preview-state"><span class="spinner" aria-hidden="true"></span>' +
+                  '<span>Fetching video info…</span></div>';
+  $("add-btn").disabled = true;
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    if (token !== previewToken) return;
+    state.preview = PREVIEW_DATA;
+    $("add-btn").disabled = false;
+    renderPreview();
+  }, 650);
+}
+
+function renderPreview() {
+  const box = $("preview");
+  if (!state.preview) return;
+  const d = state.preview;
+  const est = estimate();
+  box.hidden = false;
+  box.innerHTML =
+    '<div class="preview-thumb">' +
+      '<svg><use href="#i-play"/></svg>' +
+      '<span class="dur">' + esc(d.duration) + '</span>' +
+    '</div>' +
+    '<div class="preview-body">' +
+      '<div class="preview-title" title="' + esc(d.title) + '">' + esc(d.title) + '</div>' +
+      '<div class="preview-meta">' +
+        '<span class="mini-chip sub">' + esc(d.channel) + '</span>' +
+        '<span class="mini-chip info">' + esc(d.duration) + '</span>' +
+        '<span class="mini-chip sub">' + esc(d.views) + '</span>' +
+        '<span class="mini-chip" title="Estimated size at the selected quality">' +
+          'Will download: ' + esc(est.label) + ' · ' + esc(est.size) +
+        '</span>' +
+      '</div>' +
+    '</div>';
+}
+
+function hidePreview() {
+  clearTimeout(previewTimer);
+  previewToken++;
+  state.preview = null;
+  $("preview").hidden = true;
+  $("preview").innerHTML = "";
+  $("add-btn").disabled = false;
+}
+
+/* ============================================================
+   Queue
+   ============================================================ */
+const STATUS = {
+  pending:     ["Pending",     "st-pending",  "dot-pending"],
+  paused:      ["Paused",      "st-paused",   "dot-paused"],
+  downloading: ["Downloading", "st-download", "dot-download"],
+  completed:   ["Completed",   "st-done",     "dot-done"],
+  failed:      ["Failed",      "st-failed",   "dot-failed"]
+};
+
+function iconButton(icon, label, cls, handler, disabled) {
+  const b = el("button", "icon-btn" + (cls ? " " + cls : ""));
+  b.innerHTML = '<svg aria-hidden="true"><use href="#' + icon + '"/></svg>';
+  b.setAttribute("aria-label", label);
+  b.title = label;
+  b.disabled = Boolean(disabled);
+  b.addEventListener("click", (e) => { e.stopPropagation(); handler(); });
+  return b;
+}
+
+function rowNode(item) {
+  const [label, cls, dot] = STATUS[item.status];
+  const row = el("div", "row" + (item.status === "downloading" ? " active-row" : "") +
+                       (item.status === "failed" ? " failed" : ""));
+  row.tabIndex = 0;
+  row.setAttribute("role", "listitem");
+  row.setAttribute("aria-label",
+    item.title + " — " + item.res + ", " + label);
+
+  const tile = el("div", "tile");
+  tile.innerHTML = '<svg aria-hidden="true"><use href="#' +
+    (item.res === "MP3" ? "i-music" : "i-play") + '"/></svg>';
+  row.appendChild(tile);
+
+  const main = el("div", "row-main");
+  const title = el("div", "row-title" + (item.status === "completed" ? " dim" : ""));
+  title.textContent = item.title;
+  title.title = item.title;                   // Fix 11
+  title.dataset.fix = "11";
+  main.appendChild(title);
+
+  const meta = el("div", "row-meta");
+  meta.appendChild(el("span", "mini-chip", esc(item.res)));
+  const status = el("span", "status " + cls,
+    '<span class="dot ' + dot + '"></span>' + label);
+  meta.appendChild(status);
+  if (item.channel) meta.appendChild(el("span", "mini-chip sub", esc(item.channel)));
+  main.appendChild(meta);
+
+  if (item.status === "downloading") {
+    const prog = el("div", "row-progress");
+    prog.dataset.fix = "19";
+    prog.setAttribute("role", "progressbar");
+    prog.setAttribute("aria-valuemin", "0");
+    prog.setAttribute("aria-valuemax", "100");
+    prog.setAttribute("aria-valuenow", String(Math.round(item.pct)));
+    prog.setAttribute("aria-label", "Download progress");
+    const fill = el("span");
+    fill.style.width = item.pct + "%";
+    prog.appendChild(fill);
+    main.appendChild(prog);
+
+    const stats = el("div", "row-stats");
+    stats.dataset.fix = "2";
+    stats.innerHTML =
+      "<span>" + Math.round(item.pct) + "%</span>" +
+      '<span class="speed">2.4 MB/s</span>' +
+      "<span>ETA 0:42</span>" +
+      "<span>103 MB / 240 MB</span>";
+    main.appendChild(stats);
+  }
+
+  if (item.status === "failed") {
+    // Fix 12
+    const err = el("div", "row-error");
+    err.dataset.fix = "12";
+    err.innerHTML = '<svg aria-hidden="true"><use href="#i-alert"/></svg>' +
+                    "<span>" + esc(item.error) + "</span>";
+    err.title = item.error;
+    main.appendChild(err);
+  }
+
+  row.appendChild(main);
+
+  const actions = el("div", "row-actions");
+
+  if (item.status === "completed") {
+    // Fix 13: play, reveal, folder — the first two were missing entirely
+    actions.dataset.fix = "13";
+    actions.appendChild(iconButton("i-play", "Play", "play", () => toast("Opening in the default player…")));
+    actions.appendChild(iconButton("i-folder", "Reveal in file manager", "", () => toast("Revealed in file manager.")));
+  } else if (item.status === "downloading") {
+    actions.appendChild(iconButton("i-stop", "Cancel download", "", () => { item.status = "paused"; render(); toast("Download paused."); }));
+  } else if (item.status === "paused") {
+    actions.appendChild(iconButton("i-refresh", "Resume", "", () => { item.status = "pending"; render(); }));
+  } else if (item.status === "failed") {
+    actions.appendChild(iconButton("i-refresh", "Retry download", "", () => {
+      item.status = "pending"; item.error = ""; render(); toast("Queued for retry.");
+    }));
+  }
+
+  // Fix 14: Remove, not Delete. The file is not touched.
+  const removeBtn = iconButton("i-x", "Remove from queue", "",
+    () => { state.queue = state.queue.filter((q) => q !== item); render(); toast("Removed from queue."); });
+  removeBtn.dataset.fix = "14";
+  actions.appendChild(removeBtn);
+
+  row.appendChild(actions);
+  return row;
+}
+
+function renderQueue() {
+  const order = { pending: 0, paused: 1, downloading: 2, completed: 4, failed: 5 };
+  const sorted = [...state.queue].sort((a, b) => order[a.status] - order[b.status]);
+  const active = sorted.filter((i) => i.status === "downloading");
+  const rest = sorted.filter((i) => i.status !== "downloading");
+
+  const activeList = $("active-list");
+  const queueList = $("queue-list");
+  activeList.innerHTML = "";
+  queueList.innerHTML = "";
+  active.forEach((i) => activeList.appendChild(rowNode(i)));
+  rest.forEach((i) => queueList.appendChild(rowNode(i)));
+
+  // Fix 10: a heading with nothing under it is noise.
+  $("active-group").hidden = active.length === 0;
+  $("queue-group").hidden = rest.length === 0;
+
+  const empty = $("queue-empty");
+  if (state.queue.length === 0) {
+    empty.hidden = false;
+    empty.innerHTML =
+      '<div class="empty">' +
+        '<svg aria-hidden="true"><use href="#i-download"/></svg>' +
+        "<h2>No downloads yet</h2>" +
+        "<p>Paste a link above, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> on the queue tab.</p>" +
+        '<button class="btn primary" id="empty-cta">' +
+          '<svg aria-hidden="true"><use href="#i-plus"/></svg> Add a link</button>' +
+      "</div>";
+    $("empty-cta").addEventListener("click", () => $("url-input").focus());
+  } else {
+    empty.hidden = true;
+    empty.innerHTML = "";
+  }
+
+  const stats = {
+    total: state.queue.length,
+    pending: state.queue.filter((i) => ["pending", "paused"].includes(i.status)).length,
+    active: active.length,
+    done: state.queue.filter((i) => i.status === "completed").length
+  };
+  $("stat-total").textContent = stats.total;
+  $("stat-pending").textContent = stats.pending;
+  $("stat-active").textContent = stats.active;
+  $("stat-done").textContent = stats.done;
+
+  // Fix 15
+  const badge = $("count-badge");
+  badge.hidden = stats.pending === 0;
+  badge.textContent = stats.pending + (stats.pending === 1 ? " item" : " items");
+
+  const running = active.length > 0;
+  $("start-btn").disabled = running || !state.queue.some((i) => i.status === "pending");
+  $("stop-btn").disabled = !running;
+}
+
+function render() { renderQueue(); renderPreview(); }
+
+/* ---- actions ---- */
+$("paste-btn").addEventListener("click", async () => {
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch { text = ""; }
+  if (!text) text = "https://youtube.com/watch?v=dQw4w9WgXcQ";
+  $("url-input").value = text;
+  $("url-input").dispatchEvent(new Event("input"));
+});
+
+function addToQueue() {
+  const url = $("url-input").value.trim();
+  if (!url) { setMessage("bad", "Enter a link first."); $("url-input").focus(); return; }
+  if (!URL_RE.test(url)) { setMessage("bad", "That does not look like a supported link."); return; }
+  const title = state.preview ? state.preview.title : url.slice(0, 60);
+  state.queue.push({
+    id: Date.now(),
+    title: title,
+    res: state.audio ? "MP3" : state.res + "p",
+    status: "pending",
+    pct: 0,
+    error: ""
+  });
+  $("url-input").value = "";
+  clearMessage();
+  hidePreview();
+  render();
+  toast("Added to queue.");
+}
+
+$("add-btn").addEventListener("click", addToQueue);
+
+$("url-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.ctrlKey) { e.preventDefault(); addToQueue(); }
+});
+
+$("start-btn").addEventListener("click", runQueue);
+$("stop-btn").addEventListener("click", () => {
+  state.queue.forEach((i) => { if (i.status === "downloading") { i.status = "paused"; i.pct = 0; } });
+  render();
+  toast("Queue stopped.");
+});
+
+$("clear-btn").addEventListener("click", () => {
+  const before = state.queue.length;
+  state.queue = state.queue.filter((i) => i.status !== "completed");
+  render();
+  toast(before === state.queue.length ? "Nothing to clear." : "Cleared completed downloads.");
+});
+
+let timer = null;
+function runQueue() {
+  state.queue.forEach((i) => { if (i.status === "pending") i.status = "downloading"; });
+  render();
+  if (timer) clearInterval(timer);
+  timer = setInterval(() => {
+    let running = false;
+    state.queue.forEach((i) => {
+      if (i.status !== "downloading") return;
+      running = true;
+      i.pct = Math.min(100, i.pct + 1 + Math.random() * 3);
+      if (i.pct >= 100) { i.pct = 100; i.status = "completed"; }
+    });
+    render();
+    if (!running) { clearInterval(timer); timer = null; toast("Queue finished."); }
+  }, 420);
+}
+
+/* ============================================================
+   Fix 18 — libraries
+   ============================================================ */
+function videoNode(v) {
+  const card = el("div", "vcard");
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", v.name + ", " + v.sizeLabel);
+  card.addEventListener("dblclick", () => toast("Playing " + v.name + "…"));
+
+  const thumb = el("div", "vthumb");
+  thumb.innerHTML = '<svg aria-hidden="true"><use href="#i-play"/></svg>' +
+                    '<span class="dur">' + esc(v.duration) + "</span>";
+
+  const acts = el("div", "vacts");
+  acts.appendChild(iconButton("i-play", "Play " + v.name, "play", () => toast("Playing " + v.name + "…")));
+  acts.appendChild(iconButton("i-folder", "Reveal " + v.name, "", () => toast("Revealed in file manager.")));
+  acts.appendChild(iconButton("i-trash", "Delete " + v.name, "danger", () => {
+    // Genuinely destructive: this one may confirm.
+    if (confirm('Delete "' + v.name + '"?\n\nThis cannot be undone.')) {
+      state.videos = state.videos.filter((x) => x !== v);
+      renderVideos();
+      toast("Deleted " + v.name + ".");
+    }
+  }));
+  thumb.appendChild(acts);
+  card.appendChild(thumb);
+
+  const body = el("div", "vbody");
+  const title = el("div", "vtitle");
+  title.textContent = v.name;
+  title.title = v.name;
+  body.appendChild(title);
+
+  const meta = el("div", "vmeta");
+  meta.innerHTML = "<span>" + esc(v.date) + "</span>" +
+                   '<span class="mono">' + esc(v.sizeLabel) + "</span>";
+  body.appendChild(meta);
+  card.appendChild(body);
+  return card;
+}
+
+function renderVideos() {
+  const list = state.videos.filter((v) =>
+    !state.videoFilter || v.name.toLowerCase().includes(state.videoFilter));
+  const sorters = {
+    newest: (a, b) => b.iso - a.iso,
+    oldest: (a, b) => a.iso - b.iso,
+    largest: (a, b) => b.size - a.size,
+    name: (a, b) => a.name.localeCompare(b.name)
+  };
+  list.sort(sorters[state.videoSort]);
+
+  const grid = $("video-grid");
+  grid.innerHTML = "";
+  list.forEach((v) => grid.appendChild(videoNode(v)));
+
+  $("video-count").textContent = list.length === 0
+    ? "No videos match this search."
+    : list.length + (list.length === 1 ? " video" : " videos") + " · " +
+      (list.reduce((n, v) => n + v.size, 0) / 1e9).toFixed(1) + " GB";
+
+  const empty = $("video-empty");
+  if (state.videos.length === 0) {
+    empty.innerHTML =
+      '<div class="empty"><svg aria-hidden="true"><use href="#i-play"/></svg>' +
+      "<h2>No videos yet</h2><p>Download something and it appears here.</p></div>";
+  } else {
+    empty.innerHTML = "";
+  }
+}
+
+function musicNode(m) {
+  const row = el("div", "row");
+  row.tabIndex = 0;
+  row.setAttribute("role", "listitem");
+  const tile = el("div", "tile");
+  tile.innerHTML = '<svg aria-hidden="true"><use href="#i-music"/></svg>';
+  row.appendChild(tile);
+
+  const main = el("div", "row-main");
+  const title = el("div", "row-title");
+  title.textContent = m.title;
+  title.title = m.title;
+  main.appendChild(title);
+
+  const meta = el("div", "row-meta");
+  meta.innerHTML = '<span class="mini-chip sub">' + esc(m.artist) + "</span>" +
+                   '<span class="mini-chip info">' + esc(m.duration) + "</span>" +
+                   '<span class="mini-chip sub">' + esc(m.size) + "</span>";
+  main.appendChild(meta);
+  row.appendChild(main);
+
+  const acts = el("div", "row-actions");
+  acts.appendChild(iconButton("i-play", "Play " + m.title, "play", () => toast("Playing " + m.title + "…")));
+  acts.appendChild(iconButton("i-folder", "Reveal " + m.title, "", () => toast("Revealed in file manager.")));
+  acts.appendChild(iconButton("i-trash", "Delete " + m.title, "danger", () => {
+    if (confirm('Delete "' + m.title + '"?\n\nThis cannot be undone.')) {
+      state.music = state.music.filter((x) => x !== m);
+      renderMusic();
+      toast("Deleted " + m.title + ".");
+    }
+  }));
+  row.appendChild(acts);
+  return row;
+}
+
+function renderMusic() {
+  const list = state.music.filter((m) =>
+    !state.musicFilter ||
+    (m.title + " " + m.artist).toLowerCase().includes(state.musicFilter));
+
+  const sorters = {
+    title: (a, b) => a.title.localeCompare(b.title),
+    artist: (a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title),
+    newest: (a, b) => b.date - a.date
+  };
+  list.sort(sorters[state.musicSort]);
+
+  const box = $("music-list");
+  box.innerHTML = "";
+  list.forEach((m) => box.appendChild(musicNode(m)));
+
+  $("music-count").textContent = list.length === 0
+    ? "No tracks match this search."
+    : list.length + (list.length === 1 ? " track" : " tracks");
+
+  const empty = $("music-empty");
+  if (state.music.length === 0) {
+    empty.innerHTML =
+      '<div class="empty"><svg aria-hidden="true"><use href="#i-music"/></svg>' +
+      "<h2>No music yet</h2><p>Download audio and it appears here.</p></div>";
+  } else {
+    empty.innerHTML = "";
+  }
+}
+
+$("video-search").addEventListener("input", (e) => {
+  state.videoFilter = e.target.value.toLowerCase().trim();
+  renderVideos();
+});
+$("music-search").addEventListener("input", (e) => {
+  state.musicFilter = e.target.value.toLowerCase().trim();
+  renderMusic();
+});
+$("video-sort").addEventListener("change", (e) => { state.videoSort = e.target.value; renderVideos(); });
+$("music-sort").addEventListener("change", (e) => { state.musicSort = e.target.value; renderMusic(); });
+$("video-refresh").addEventListener("click", () => { renderVideos(); toast("Library refreshed."); });
+$("music-refresh").addEventListener("click", () => { renderMusic(); toast("Library refreshed."); });
+
+/* ============================================================
+   Fix 16/17 — settings
+   ============================================================ */
+document.querySelectorAll(".switch").forEach((sw) => {
+  sw.addEventListener("click", () => {
+    const next = sw.getAttribute("aria-checked") !== "true";
+    sw.setAttribute("aria-checked", String(next));
+    if (sw.dataset.setting === "audio") state.audio = next;
+    persist();
+  });
+});
+
+document.querySelectorAll(".seg[data-setting]").forEach((seg) => {
+  seg.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+    if (seg.dataset.setting === "res") {
+      state.res = b.dataset.value;
+      document.querySelectorAll(".pill[data-res]").forEach((p) =>
+        p.setAttribute("aria-pressed", String(p.dataset.res === state.res)));
+    }
+    persist();
+  });
+});
+
+$("reset-btn").addEventListener("click", () => {
+  if (!confirm("Reset every setting to its default?\n\nThis does not delete your downloads.")) return;
+  state.family = "arisu";
+  state.mode = "dark";
+  state.res = "1080";
+  state.audio = false;
+  document.querySelectorAll(".switch").forEach((s) => s.setAttribute("aria-checked", "false"));
+  document.querySelectorAll('.seg[data-setting="res"] button').forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.value === "1080")));
+  document.querySelectorAll(".pill[data-res]").forEach((p) => {
+    p.disabled = false;
+    p.setAttribute("aria-pressed", String(p.dataset.res === "1080"));
+  });
+  $("audio-pill").setAttribute("aria-pressed", "false");
+  applyTheme();
+  persist();
+  toast("Settings reset to defaults.");
+});
+
+/* ============================================================
+   Fixes overlay
+   ============================================================ */
+function setFixes(open) {
+  state.fixes = open;
+  document.body.classList.toggle("fixes-on", open);
+  $("fixes-panel").classList.toggle("open", open);
+  $("fixes-panel").setAttribute("aria-hidden", String(!open));
+  $("fixes-toggle").setAttribute("aria-expanded", String(open));
+}
+$("fixes-toggle").addEventListener("click", () => setFixes(!state.fixes));
+$("fixes-close").addEventListener("click", () => setFixes(false));
+
+/* ============================================================
+   Fix 7 — keyboard parity
+   ============================================================ */
+document.addEventListener("keydown", (e) => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+
+  if (e.key === "Escape") {
+    if (state.fixes) { setFixes(false); return; }
+    if (typing) { $("url-input").value = ""; clearMessage(); hidePreview(); }
+    return;
+  }
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    if (!$("start-btn").disabled) runQueue();
+    return;
+  }
+  if ((e.key === "/" && !typing) || (e.key === "f" && (e.ctrlKey || e.metaKey))) {
+    e.preventDefault();
+    const target = state.page === "videos" ? $("video-search")
+                 : state.page === "music" ? $("music-search")
+                 : null;
+    if (target) target.focus();
+    return;
+  }
+  if (e.key === "?" && !typing) { e.preventDefault(); setFixes(!state.fixes); }
+});
+
+/* ============================================================
+   Boot
+   ============================================================ */
+applyTheme();
+renderVideos();
+renderMusic();
+render();
+$("url-input").focus();
+</script>
+</body>
+</html>

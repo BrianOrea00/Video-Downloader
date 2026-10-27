@@ -1,6 +1,6 @@
 # url_validator.py
 import re
-from urllib.parse import urlparse, parse_qs, urlunparse
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 
 def is_youtube_url(url: str) -> bool:

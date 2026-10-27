@@ -1,4 +1,13 @@
-yt-dlp==2026.3.17
+# Runtime dependencies. Install with: python -m pip install -r requirements.txt
+#
+# `default` pulls the pieces yt-dlp needs for real sites (certifi, requests,
+# brotli, websockets, pycryptodomex, yt-dlp-ejs); `secretstorage` is what lets
+# `cookiesfrombrowser` read Chromium cookies on Linux.
+yt-dlp[default,secretstorage]==2026.8.19
+
+# Only QtCore, QtGui and QtWidgets are imported, so the Essentials wheel is
+# enough; the Addons metapackage drags in WebEngine (~400 MB) unused.
+PySide6-Essentials==6.12.0
+
+# Direct import for music metadata; also pulled in by yt-dlp's default extra.
 mutagen>=1.47.0
-customtkinter>=5.2.0
-pillow>=10.0.0

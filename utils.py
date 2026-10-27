@@ -1,90 +1,77 @@
-import json
+import hashlib
 import os
-from config import HISTORY_FILE, QUEUE_FILE, SETTINGS_FILE, DEFAULT_SETTINGS
+import re
+import shutil
+import subprocess
+import sys
+from urllib.parse import urlsplit
 
-def save_history(data):
-    from datetime import datetime
-    
-    if not os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "w") as f:
-            json.dump([], f)
-    
-    # Add date_added if not present
-    if "date_added" not in data:
-        data["date_added"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    with open(HISTORY_FILE, "r+") as f:
-        history = json.load(f)
-        history.append(data)
-        f.seek(0)
-        json.dump(history, f, indent=4)
+_URL_RE = re.compile(r"https?://[^\s'\"<>)\]]+", re.IGNORECASE)
 
-def clean_filename(name):
-    return "".join(c for c in name if c not in r'\/:*?"<>|')
 
-def load_queue():
-    """Load queue from JSON file"""
-    if not os.path.exists(QUEUE_FILE):
-        return []
+def resource_path(relative: str) -> str:
+    """Absolute path to a bundled resource, from source or a frozen build."""
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, relative)
+
+
+def ffmpeg_available() -> bool:
+    """True when an ffmpeg binary is on PATH.
+
+    Audio extraction and MP4 merging both fail without it, so the UI disables
+    those choices instead of letting a download fail later.
+    """
+    return shutil.which("ffmpeg") is not None
+
+
+def redact_url(url: str) -> str:
+    """Host plus a short fingerprint instead of the full URL.
+
+    Logs are meant to be shareable, so a downloaded video's identity must not
+    be in them, while a fingerprint still lets two lines be correlated.
+    """
     try:
-        with open(QUEUE_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return []
+        parts = urlsplit(url if "://" in url else "https://" + url)
+    except ValueError:
+        return "unparsed-url"
+    host = parts.hostname or "unknown-host"
+    digest = hashlib.sha256(url.encode("utf-8", "replace")).hexdigest()[:8]
+    return f"{host}#{digest}"
 
-def save_queue(queue):
-    """Save queue to JSON file"""
-    with open(QUEUE_FILE, "w") as f:
-        json.dump(queue, f, indent=4)
 
-def load_settings():
-    """Load settings from JSON file"""
-    if not os.path.exists(SETTINGS_FILE):
-        save_settings(DEFAULT_SETTINGS)
-        return DEFAULT_SETTINGS.copy()
-    try:
-        with open(SETTINGS_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return DEFAULT_SETTINGS.copy()
+def redact_text(text: str) -> str:
+    """Redact every URL and the home directory in a log or error message."""
+    if not text:
+        return text
+    redacted = _URL_RE.sub(lambda match: redact_url(match.group(0)), text)
+    home = os.path.expanduser("~")
+    if home and home != "~":
+        redacted = redacted.replace(home, "~")
+    return redacted
 
-def save_settings(settings):
-    """Save settings to JSON file"""
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(settings, f, indent=4)
 
-def detect_vlc():
-    """Auto-detect VLC executable path"""
-    import sys
-    import subprocess
-    
-    common_paths = []
-    
+def detect_vlc() -> str | None:
+    """Auto-detect the VLC executable, or return ``None``."""
     if sys.platform == "win32":
         common_paths = [
             r"C:\Program Files\VideoLAN\VLC\vlc.exe",
             r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe",
         ]
-    elif sys.platform == "darwin":  # macOS
-        common_paths = [
-            "/Applications/VLC.app/Contents/MacOS/VLC",
-        ]
-    else:  # Linux
-        common_paths = [
-            "/usr/bin/vlc",
-            "/usr/local/bin/vlc",
-        ]
-    
+    elif sys.platform == "darwin":
+        common_paths = ["/Applications/VLC.app/Contents/MacOS/VLC"]
+    else:
+        common_paths = ["/usr/bin/vlc", "/usr/local/bin/vlc"]
+
     for path in common_paths:
         if os.path.exists(path):
             return path
-    
-    # Try to find in PATH
+
     try:
-        result = subprocess.run(['which', 'vlc'], capture_output=True, text=True)
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except:
-        pass
-    
+        result = subprocess.run(
+            ["which", "vlc"], capture_output=True, text=True, check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
     return None
