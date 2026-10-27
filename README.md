@@ -4,6 +4,22 @@ A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`
 
 ---
 
+## 📸 Screenshots
+
+| Download Console | Video Library |
+|---|---|
+| ![Queue page](docs/screenshots/queue.png) | ![Video library](docs/screenshots/videos.png) |
+
+| Music Library | Settings |
+|---|---|
+| ![Music library](docs/screenshots/music.png) | ![Settings page](docs/screenshots/settings.png) |
+
+The images are rendered from the real widgets with seeded sample data, not mocked up:
+`QT_QPA_PLATFORM=offscreen python docs/make_screenshots.py` regenerates them into
+`docs/screenshots/`.
+
+---
+
 ## ✨ Features
 
 ### Download Console (Queue)
@@ -13,9 +29,10 @@ A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`
 - Parallel or sequential download modes with a configurable concurrency limit
 - Real-time per-row progress with speed, ETA, and transferred size
 - Per-item open-folder, cancel, resume, and delete controls
+- Reorder pending and paused rows (up/down) so the queue matches the order you want
 - Duplicate detection against both the queue and history
 - Queue persisted to `queue.json` — survives app restarts; interrupted items resume as pending
-- Completed downloads appended to `history.json`
+- Completed downloads appended to `history.json`, capped at the 1000 most recent entries with a **Clear History** action
 
 ### Video Library
 - Scans the download folder for video files (`.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.flv`, `.wmv`, `.m4v`)
@@ -33,7 +50,8 @@ A modular desktop video downloader built with Python, PySide6 (Qt), and `yt-dlp`
 - **Download:** parallel vs. sequential mode, max parallel downloads, default resolution, audio-only default
 - **General:** auto clipboard detection toggle, clipboard polling interval
 - **Cookies:** browser cookie extraction (Chrome, Firefox, Edge, Brave, Opera, Safari) or a custom `cookies.txt` path, plus a **Test cookies** button
-- **Appearance:** theme family (Arisu Pink, SaaS Blue, Arch Blue) and dark/light mode; the top bar keeps a one-click mode toggle
+- **Appearance:** theme family (Arisu Pink, SaaS Blue, Arch Blue), dark/light mode and interface scale; the top bar keeps a one-click mode toggle
+- **Download Engine:** shows the running `yt-dlp` version, whether it is bundled or updated, and a **Check for updates** button that verifies a newer wheel's SHA256 before use
 
 ### UI / General
 - Sidebar navigation with active-page indicator and a storage meter
