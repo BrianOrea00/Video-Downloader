@@ -24,3 +24,6 @@ queue.json
 
 # Thumbnails
 .thumbs/
+
+# Local assistant notes (not part of the project)
+.opencode/memory/
